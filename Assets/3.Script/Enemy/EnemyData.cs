@@ -90,7 +90,7 @@ public class EnemyData : ScriptableObject
     [SerializeField, Range(0f, 1f)] float delayChance = 0.5f;     // 마지막 타 직전 칼을 든 채 멈칫할 확률 (지연 베기)
     [SerializeField] Vector2 delayTime = new Vector2(0.35f, 0.65f);
 
-    // [변경] 보스 개편: 기술 대응 · 위험 공격 · 2페이즈 압박 · 체간 회복 가속 (EnemySwordsman.BossAI.cs)
+    // 보스 개편: 기술 대응 · 위험 공격 · 2페이즈 압박 · 체간 회복 가속 (EnemySwordsman.BossAI.cs)
     [Header("Boss · AI")]
     [SerializeField] float skillDeflectCooldown = 12f;   // 섬뢰일도를 튕겨내고 반격하는 간격 (2페이즈는 쿨타임 배율 적용)
     [SerializeField] int parriesBeforePerilous = 2;      // 이 시간 안에 연달아 이만큼 패링당하면 다음 연타 첫 타가 위험 공격
@@ -126,7 +126,7 @@ public class EnemyData : ScriptableObject
     [SerializeField] float leapCooldown = 9f;
     [SerializeField] float leapRecovery = 1.3f;
 
-    [Header("Boss · Sword Wave (2페이즈)")]
+    [Header("Boss · Sword Wave")]
     [SerializeField] AttackData waveAttack; // 연속이면 nextLight로 이어짐 (한 번 벨 때마다 검기 하나)
     [SerializeField] float waveMinDistance = 4f;
     [SerializeField] float waveSpeed = 16f;
@@ -134,6 +134,9 @@ public class EnemyData : ScriptableObject
     [SerializeField] float waveWidth = 2.2f;
     [SerializeField] float waveDamage = 16f;
     [SerializeField] float waveCooldown = 6f;
+    [SerializeField] bool wavePhase1 = true;              // [변경] 1페이즈에도 검기 (쿨타임 × wavePhase1CooldownScale)
+    [SerializeField] float wavePhase1CooldownScale = 1.5f;
+    [SerializeField] float phase2WaveSpread = 20f;        // [변경] 2페이즈 검기를 이 각도로 세 갈래 (0이면 한 줄기)
 
     public EnemyKind Kind => kind;
     public float MaxHealth => maxHealth;
@@ -243,4 +246,7 @@ public class EnemyData : ScriptableObject
     public float WaveWidth => waveWidth;
     public float WaveDamage => waveDamage;
     public float WaveCooldown => waveCooldown;
+    public bool WavePhase1 => wavePhase1;
+    public float WavePhase1CooldownScale => wavePhase1CooldownScale;
+    public float Phase2WaveSpread => phase2WaveSpread;
 }

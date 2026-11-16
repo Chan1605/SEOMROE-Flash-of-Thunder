@@ -2,7 +2,7 @@ using UnityEngine;
 
 // 플레이어 효과음. 전투·스킬 이벤트를 받아 소리만 담당 (PlayerVfx와 같은 방식)
 //  - 휘두르기: 매 공격마다 바람 소리. 판정이 켜지는 순간에 소리 정점이 오도록 지연 재생 (공속 반영)
-//    [변경] 적을 베면 바람 소리는 바로 줄여 끔 → 베는 소리만 들림 (예전엔 두 소리가 겹쳐 남)
+//    적을 베면 바람 소리는 바로 줄여 끔 → 베는 소리만 들림 (예전엔 두 소리가 겹쳐 남)
 //  - 베기: 칼이 적에게 맞았을 때 위에 겹침. 한 번에 여럿을 베도 한 번만
 //  - 타격음 3겹: 베는 소리 + 살 맞는 둔탁한 소리 + 저음 쿵(강한 공격일수록 큼) → 가벼운 느낌 보완
 //  - 발소리: PlayerFootsteps를 실행 중에 붙여 발이 땅에 닿을 때마다
@@ -11,6 +11,7 @@ using UnityEngine;
 //  - 발도 자세 진입: 진입음을 반복음 위에 겹쳐 한 번 (반복음은 끊기지 않음)
 //  - 일섬 돌진: 표식한 적 옆을 지나가는 순간마다 베는 소리 // 돌진 시작 → 지나가는 순간(슬로와 같은 박자)
 //  - 일섬 적중(칼을 거둔 뒤 일괄 베기): 낙뢰음. 여럿을 베면 첫 소리 뒤로 작게 몇 번 더 (따다닥)
+//  - [변경] 처형: 숨통을 끊는 순간 처형 전용 소리 + 베는 소리를 낮게 겹침 / 완벽 회피: 성공 순간 맑은 "팅" + 시간이 늘어지는 울림
 // 연결은 Tools/Setup/Player Sfx. 슬롯을 비우면 그 소리만 꺼짐
 public class PlayerSfx : MonoBehaviour
 {
@@ -39,6 +40,13 @@ public class PlayerSfx : MonoBehaviour
     [SerializeField] AudioClip[] hitThumpClips;  // 저음 쿵
     [SerializeField, Range(0f, 1f)] float hitThumpVolume = 0.85f;
     [SerializeField, Range(0f, 1f)] float lightThumpScale = 0.35f; // 약공격은 쿵을 작게
+
+    [Header("Execution / Just Dodge")] // [변경]
+    [SerializeField] AudioClip[] executionClips;
+    [SerializeField, Range(0f, 1f)] float executionVolume = 1f;
+    [SerializeField, Range(0f, 1f)] float executionSliceVolume = 0.6f; // 겹치는 베는 소리 크기
+    [SerializeField] AudioClip[] justDodgeClips;
+    [SerializeField, Range(0f, 1f)] float justDodgeVolume = 0.8f;
 
     [Header("Footsteps")]
     [SerializeField] AudioClip[] footstepClips;
@@ -70,6 +78,10 @@ public class PlayerSfx : MonoBehaviour
     AudioSource oneShot;
     AudioSource bodySource, thumpSource;
     int lastBody = -1, lastThump = -1;
+    AudioSource executionSource, dodgeSource; // [변경]
+    int lastExecution = -1, lastDodge = -1;
+    PlayerExecution execution;
+    PlayerDodge dodge;
     AudioSource swingSource; // 종류마다 소스를 나눔 (한 소스의 피치를 바꾸면 이미 울리는 소리까지 바뀜)
     AudioSource dashSource;
     AudioSource[] strikeSources; // 덧붙는 낙뢰음은 예약 재생이 필요해 소스를 따로 둠
@@ -78,7 +90,7 @@ public class PlayerSfx : MonoBehaviour
     AudioSource stanceLoopSource;
 
     int lastSwing = -1;
-    float airFade = -1f; // [변경] 0 이상이면 바람 소리를 줄이는 중
+    float airFade = -1f; // 0 이상이면 바람 소리를 줄이는 중
     int lastAirSwing = -1;
     int lastDashCut = -1;
     AttackData pendingSwing;
@@ -100,10 +112,14 @@ public class PlayerSfx : MonoBehaviour
         if (skill == null) skill = GetComponent<PlayerSkill>();
         if (heavyCharge == null) heavyCharge = GetComponent<PlayerChargeAttack>();
         if (weapon == null) weapon = GetComponentInChildren<WeaponHitbox>(true);
+        execution = GetComponent<PlayerExecution>(); // [변경]
+        dodge = GetComponent<PlayerDodge>();
 
         oneShot = CreateSource("Sfx_OneShot", false);
         bodySource = CreateSource("Sfx_HitBody", false);
         thumpSource = CreateSource("Sfx_HitThump", false);
+        executionSource = CreateSource("Sfx_Execution", false); // [변경]
+        dodgeSource = CreateSource("Sfx_JustDodge", false);
         if (footstepClips != null && footstepClips.Length > 0 && GetComponent<PlayerFootsteps>() == null)
             gameObject.AddComponent<PlayerFootsteps>().Init(footstepClips, footstepVolume, footstepPitch, footstepFullSpeed);
         swingSource = CreateSource("Sfx_Swing", false);
@@ -118,6 +134,8 @@ public class PlayerSfx : MonoBehaviour
     {
         if (weapon != null) weapon.OnHit += OnWeaponHit;
         if (combat != null) combat.AttackStarted += OnAttackStarted;
+        if (execution != null) execution.Executed += OnExecuted; // [변경]
+        if (dodge != null) dodge.JustDodged += OnJustDodged;
         if (skill != null)
         {
             skill.HoldStarted += OnHoldStarted;
@@ -138,6 +156,8 @@ public class PlayerSfx : MonoBehaviour
     {
         if (weapon != null) weapon.OnHit -= OnWeaponHit;
         if (combat != null) combat.AttackStarted -= OnAttackStarted;
+        if (execution != null) execution.Executed -= OnExecuted; // [변경]
+        if (dodge != null) dodge.JustDodged -= OnJustDodged;
         pendingTimer = -1f;
         if (skill != null)
         {
@@ -209,7 +229,7 @@ public class PlayerSfx : MonoBehaviour
         swingSource.PlayOneShot(clip, airSwingVolume * AudioOptions.SfxVolume);
     }
 
-    // [변경] 적중 순간 바람 소리를 0.04초 만에 줄여 끔 (뚝 끊기는 소리가 나지 않게) · 아직 예약 중이면 취소
+    // 적중 순간 바람 소리를 0.04초 만에 줄여 끔 (뚝 끊기는 소리가 나지 않게) · 아직 예약 중이면 취소
     void SilenceAirSwing()
     {
         pendingTimer = -1f;
@@ -279,7 +299,7 @@ public class PlayerSfx : MonoBehaviour
     void OnWeaponHit(IDamageable target, DamageInfo info, HitResult result)
     {
         if (result != HitResult.Hit) return;
-        SilenceAirSwing(); // [변경] 베었으면 허공 소리는 끔
+        SilenceAirSwing(); // 베었으면 허공 소리는 끔
         if (swingClips == null || swingClips.Length == 0) return;
         if (Time.unscaledTime - lastHitTime < hitSoundInterval) return;
         lastHitTime = Time.unscaledTime;
@@ -305,6 +325,16 @@ public class PlayerSfx : MonoBehaviour
         source.pitch = basePitch * Random.Range(0.95f, 1.05f);
         source.PlayOneShot(clip, volume * AudioOptions.SfxVolume);
     }
+
+    // ===== [변경] 처형 · 완벽 회피 =====
+    // 처형 짝 모션에서 숨통을 끊는 순간(Executed): 처형 소리 + 베는 소리를 낮게 겹쳐 묵직하게
+    void OnExecuted(EnemySwordsman victim)
+    {
+        PlayLayer(executionSource, executionClips, ref lastExecution, executionVolume, 1f);
+        PlayLayer(oneShot, swingClips, ref lastSwing, swingVolume * executionSliceVolume, 0.85f);
+    }
+
+    void OnJustDodged() => PlayLayer(dodgeSource, justDodgeClips, ref lastDodge, justDodgeVolume, 1f);
 
     // ===== Q 차지 · 발도 자세 =====
     void OnHoldStarted()

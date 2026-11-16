@@ -3,7 +3,7 @@ using UnityEngine;
 // 보스(EnemyKind.Boss) 흑뢰: 검병 상태 머신 위에 패턴을 얹음
 // 맞아도 경직이 없고 체간(자세)만 쌓임 → 가득 차면 체간 붕괴(처형 기회). 처형은 즉사 대신 최대 체력 비율 피해 → 기상
 // 가까이: 연속 베기(firstAttack 연쇄, 간파·패링 가능) 또는 잡기(붉은 예고, 회피로만 피함)
-// 중거리: 도약 내려찍기(바닥에 범위 예고) · 2페이즈: 검기(멀리 날아오는 참격)
+// 중거리: 도약 내려찍기(바닥에 범위 예고) · 검기(멀리 날아오는 참격, 1페이즈는 드물게 · 2페이즈는 세 갈래)
 // 체력 phase2Ratio 이하 → 포효(가까우면 밀쳐냄) 후 2페이즈: 동작이 빨라지고 쿨타임이 짧아짐
 public partial class EnemySwordsman
 {
@@ -96,7 +96,7 @@ public partial class EnemySwordsman
         grabReadyTime = leapReadyTime = waveReadyTime = 0f;
         ReleaseGrabbedPlayer();
         DestroyTelegraph();
-        InitBossAI(); // [변경] 개편 상태(간파 쿨타임 · 패링 적응 · 위험 공격) 초기화
+        InitBossAI(); // 개편 상태(간파 쿨타임 · 패링 적응 · 위험 공격) 초기화
     }
 
     void OnDisable()
@@ -119,7 +119,7 @@ public partial class EnemySwordsman
         }
         float sinceHit = localTime - lastPostureHit;
         if (!postureBroken && posture > 0f && sinceHit >= data.PostureRegenDelay)
-            posture = Mathf.Max(0f, posture - data.PostureRegenRate * PostureRegenScale(sinceHit) * dt); // [변경] 오래 쉬게 둘수록 빨리 회복
+            posture = Mathf.Max(0f, posture - data.PostureRegenRate * PostureRegenScale(sinceHit) * dt); // 오래 쉬게 둘수록 빨리 회복
     }
 
     // 추적 중 보스 전용 판단. true면 이번 프레임은 보스가 행동을 정함
@@ -154,7 +154,7 @@ public partial class EnemySwordsman
         if (localTime < attackReadyTime || dist <= data.AttackRange + 1f) return false;
 
         bool canLeap = data.LeapAttack != null && localTime >= leapReadyTime && dist >= data.LeapMinDistance && dist <= data.LeapMaxDistance;
-        bool canWave = phase2 && data.WaveAttack != null && localTime >= waveReadyTime && dist >= data.WaveMinDistance;
+        bool canWave = (phase2 || data.WavePhase1) && data.WaveAttack != null && localTime >= waveReadyTime && dist >= data.WaveMinDistance; // [변경] 1페이즈에도
         if (canLeap && canWave)
         {
             if (Random.value < 0.5f) canWave = false;
@@ -167,7 +167,7 @@ public partial class EnemySwordsman
         }
         if (canWave)
         {
-            waveReadyTime = localTime + data.WaveCooldown * CooldownScale;
+            waveReadyTime = localTime + data.WaveCooldown * (phase2 ? CooldownScale : data.WavePhase1CooldownScale); // [변경] 1페이즈는 더 드물게
             StartAttack(data.WaveAttack);
             Log("검기");
             return true;
@@ -208,8 +208,8 @@ public partial class EnemySwordsman
 
         AttackData next = attack.GetNext(AttackInput.Light);
         if (next == null) return;
-        if (attack != data.FirstAttack) ClearPerilous(); // [변경] 위험 공격은 첫 타만
-        comboStop = ComboIndex(attack) >= 1 && Random.value < ComboStopChance; // [변경] 2페이즈는 덜 끊음
+        if (attack != data.FirstAttack) ClearPerilous(); // 위험 공격은 첫 타만
+        comboStop = ComboIndex(attack) >= 1 && Random.value < ComboStopChance; // 2페이즈는 덜 끊음
         if (!comboStop && next.GetNext(AttackInput.Light) == null && Random.value < data.DelayChance)
         {
             pendingDelay = Random.Range(data.DelayTime.x, data.DelayTime.y);
@@ -524,12 +524,19 @@ public partial class EnemySwordsman
         dir = dir.sqrMagnitude > 0.01f ? dir.normalized : transform.forward;
         float s = transform.lossyScale.x;
         Vector3 origin = transform.position + Vector3.up * 1.1f * s + dir * 0.8f * s;
-        BossSwordWave.Fire(gameObject, origin, dir, data.WaveSpeed, data.WaveRange, data.WaveWidth, new DamageInfo
+        // [변경] 2페이즈는 가운데 + 좌우로 세 갈래 → 옆으로 비켜서는 것만으론 못 피함 (회피 · 점프)
+        int count = phase2 && data.Phase2WaveSpread > 0f ? 3 : 1;
+        for (int i = 0; i < count; i++)
         {
-            Attacker = gameObject,
-            Damage = data.WaveDamage * DamageMul,
-            Weight = AttackWeight.Heavy
-        }, waveVisual, waveHitVfx, telegraphMaterial);
+            float angle = count == 1 ? 0f : (i - 1) * data.Phase2WaveSpread;
+            Vector3 d = Quaternion.Euler(0f, angle, 0f) * dir;
+            BossSwordWave.Fire(gameObject, origin, d, data.WaveSpeed, data.WaveRange, data.WaveWidth, new DamageInfo
+            {
+                Attacker = gameObject,
+                Damage = data.WaveDamage * DamageMul,
+                Weight = AttackWeight.Heavy
+            }, waveVisual, waveHitVfx, telegraphMaterial);
+        }
     }
 
     // ===== 2페이즈 포효 =====
@@ -582,7 +589,7 @@ public partial class EnemySwordsman
     // ===== 피해 · 체간 =====
     HitResult BossReceiveDamage(DamageInfo info)
     {
-        if (TryDeflectSkill(info)) return HitResult.Blocked; // [변경] 섬뢰일도를 쿨타임마다 튕겨내고 반격
+        if (TryDeflectSkill(info)) return HitResult.Blocked; // 섬뢰일도를 쿨타임마다 튕겨내고 반격
         float max = data.MaxHealth * healthScale;
         float damage = info.Damage;
         if (info.Weight == AttackWeight.Execution) damage = max * data.ExecutionDamageRatio;
@@ -616,7 +623,7 @@ public partial class EnemySwordsman
         Vector3 dir = Flat(transform.position - parrier.transform.position).normalized;
         Flash(parryColor);
         AddPosture(data.ParryPosture, dir);
-        CountParried(); // [변경] 연달아 패링당하면 다음 연타에 위험 공격
+        CountParried(); // 연달아 패링당하면 다음 연타에 위험 공격
         if (!postureBroken) EnterStun(true, dir, data.ParryStunTime);
         Log($"간파당함 · 체간 {posture:0}/{data.MaxPosture:0}");
         return HitResult.Countered;
@@ -716,7 +723,7 @@ public partial class EnemySwordsman
     {
         color = BaseTint;
         if (!IsBoss) return false;
-        if (PerilousColor(out color)) return true; // [변경] 위험 공격 예고 (빠르게 붉게 깜빡임)
+        if (PerilousColor(out color)) return true; // 위험 공격 예고 (빠르게 붉게 깜빡임)
         color = BaseTint;
         float pulse = 0.5f + 0.5f * Mathf.Sin(localTime * 18f);
         switch (state)

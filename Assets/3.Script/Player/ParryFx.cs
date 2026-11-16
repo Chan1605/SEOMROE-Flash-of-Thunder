@@ -82,7 +82,7 @@ public class ParryFx : MonoBehaviour
     [Header("Sound")]
     [SerializeField] AudioClip clashClip;  // 높은 금속음
     [SerializeField] AudioClip impactClip; // 낮은 쿵
-    [SerializeField] AudioClip kanpaClip;  // 간파에만 겹쳐 재생 (예: 천둥·여운)
+    [SerializeField] AudioClip kanpaClip;  // 간파에만 겹쳐 재생 
     [SerializeField, Range(0f, 1f)] float volume = 0.9f;
 
     class Ring { public LineRenderer Line; public Vector3 Center; public float Age, Life, Size; public Color Color; }

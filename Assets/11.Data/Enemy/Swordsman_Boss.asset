@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Swordsman_Boss
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   kind: 3
-  maxHealth: 900
+  maxHealth: 1300
   detectRange: 40
   attackRange: 2.6
   walkSpeed: 1.8
@@ -21,8 +21,8 @@ MonoBehaviour:
   runDistance: 4
   turnSpeed: 540
   firstAttack: {fileID: 11400000, guid: 27e75d925e6efe94d9897a307cff17fa, type: 2}
-  windupTime: 0.4
-  attackCooldown: 1.2
+  windupTime: 0.35
+  attackCooldown: 0.9
   armorDuringSwing: 1
   armorWholeSwing: 1
   lightStunTime: 0.3
@@ -53,11 +53,11 @@ MonoBehaviour:
   chargeCooldown: 2.5
   exhaustTime: 1.4
   displayName: "\uD751\uB8B0"
-  maxPosture: 100
+  maxPosture: 120
   postureRegenDelay: 1.5
   postureRegenRate: 14
   postureBreakStun: 3.5
-  parryPosture: 30
+  parryPosture: 24
   executionDamageRatio: 0.25
   instantKillDamageRatio: 0.12
   phase2Ratio: 0.5
@@ -91,5 +91,12 @@ MonoBehaviour:
   waveRange: 22
   waveWidth: 2.2
   waveDamage: 16
-  waveCooldown: 6
-  attackPower: 1.4
+  waveCooldown: 5
+  attackPower: 1.7
+  skillDeflectCooldown: 8
+  perilousChance: 0.25
+  phase2PerilousChance: 0.45
+  phase2ComboRestartChance: 0.5
+  wavePhase1: 1
+  wavePhase1CooldownScale: 1.5
+  phase2WaveSpread: 20

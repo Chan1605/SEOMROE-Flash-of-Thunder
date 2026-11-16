@@ -78,6 +78,13 @@ public class ThirdPersonCamera : MonoBehaviour
 
     public void EndCinematic() => cinematic = false;
 
+    // [변경] 순간이동 직후: 따라오는 지연 없이 바로 대상 뒤로 (멀리서 휙 날아오지 않게)
+    public void Snap(float yawAngle)
+    {
+        yaw = yawAngle;
+        pivotReady = false;
+    }
+
     void OnEnable()
     {
         if (lookAction != null) lookAction.action.Enable();
@@ -127,7 +134,7 @@ public class ThirdPersonCamera : MonoBehaviour
 
     void LateUpdate()
     {
-        if (GamePause.IsPaused) return; // [변경] 일시정지 중엔 입력·진행을 멈춤
+        if (GamePause.IsPaused) return; // 일시정지 중엔 입력·진행을 멈춤
         if (target == null) return;
 
         // 히트스톱(timeScale 저하) 중에도 카메라는 실시간으로 움직이도록 unscaled 사용
@@ -146,7 +153,7 @@ public class ThirdPersonCamera : MonoBehaviour
         else
         {
             Vector2 look = lookAction != null ? lookAction.action.ReadValue<Vector2>() : Vector2.zero;
-            float sens = sensitivity * GameSettings.SensitivityMultiplier; // [변경] 설정 화면의 마우스 감도
+            float sens = sensitivity * GameSettings.SensitivityMultiplier; // 설정 화면의 마우스 감도
             yaw += look.x * sens;
             pitch = Mathf.Clamp(pitch - look.y * sens, minPitchAngle, maxPitch);
         }

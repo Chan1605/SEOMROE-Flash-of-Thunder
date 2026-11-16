@@ -1496,9 +1496,9 @@ MonoBehaviour:
     lightIntensity: 4
     lightPercent: 1
     lightColor: {r: 0.6, g: 0.75, b: 1, a: 1}
-  clashClip: {fileID: 8300000, guid: be91ee60980f6b74fba27903861b1b7f, type: 3}
-  impactClip: {fileID: 0}
-  kanpaClip: {fileID: 0}
+  clashClip: {fileID: 8300000, guid: 1c3afd328be500b469d60e22367d6283, type: 3}
+  impactClip: {fileID: 8300000, guid: be91ee60980f6b74fba27903861b1b7f, type: 3}
+  kanpaClip: {fileID: 8300000, guid: 9f60bb410e5703649820117e5e6b8281, type: 3}
   volume: 0.9
   smashRingColor: {r: 1, g: 0.82, b: 0.35, a: 0.9}
   smashRingSize: 4.5
@@ -1778,6 +1778,15 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 6b5e5db13c774f1b9d9200e4ee310782, type: 3}
   hitThumpVolume: 0.85
   lightThumpScale: 0.35
+  executionClips:
+  - {fileID: 8300000, guid: a4ef42d4e1f045b4abbb3f680851c302, type: 3}
+  - {fileID: 8300000, guid: 8236ea22170845db8f8091d8197a67eb, type: 3}
+  executionVolume: 1
+  executionSliceVolume: 0.6
+  justDodgeClips:
+  - {fileID: 8300000, guid: 7583ff40de9e2414f9d239747754429b, type: 3}
+  - {fileID: 8300000, guid: 7583ff40de9e2414f9d239747754429b, type: 3}
+  justDodgeVolume: 0.8
   footstepClips:
   - {fileID: 8300000, guid: bde8196e8ad14963955a5b633a300850, type: 3}
   - {fileID: 8300000, guid: 321cd266de464da4ba65c2b612876abe, type: 3}
@@ -1795,9 +1804,9 @@ MonoBehaviour:
   stanceFadeOut: 0.15
   maxChargeLevel: 2
   dashCutClips:
-  - {fileID: 8300000, guid: 5b17c3846b09b1746ac7299b16735509, type: 3}
-  - {fileID: 8300000, guid: 426d4eac2963f584e971c4bc86500f3f, type: 3}
-  - {fileID: 8300000, guid: 5ec232906b088fc4a886edac2d750da5, type: 3}
+  - {fileID: 8300000, guid: c4f0a3908fee490c926d6d27cc3bd2f3, type: 3}
+  - {fileID: 8300000, guid: c4f0a3908fee490c926d6d27cc3bd2f3, type: 3}
+  - {fileID: 8300000, guid: c4f0a3908fee490c926d6d27cc3bd2f3, type: 3}
   dashCutVolume: 0.9
   strikeClips:
   - {fileID: 8300000, guid: 9f60bb410e5703649820117e5e6b8281, type: 3}

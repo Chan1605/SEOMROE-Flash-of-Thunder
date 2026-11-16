@@ -1,12 +1,16 @@
+using System.Collections;
 using System.Collections.Generic;
 using SickscoreGames.HUDNavigationSystem;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 // 던전(뇌운 협곡) 진행 — Tools/Setup/Dungeon Scene이 배치
 //  가운데 허브에서 동 · 서 · 북 갈래 방(각자 ZoneArena)을 원하는 순서로 깸 → 갈래마다 스킬 포인트
 //  셋 다 깨면 허브 구역(ZoneArena, 처음엔 꺼 둠)이 깨어나 수문장(중간보스) 전투 → 이기면 남쪽 출구(본편 보스 구역 입구로)
-//  [변경] 목표 안내: 오른쪽 위에 남은 목표 + 거리, 나침반 · 화면 밖 화살표에도 같은 목표 표식 (클리어한 갈래는 빠짐)
+//  목표 안내: 오른쪽 위에 남은 목표 + 거리, 나침반 · 화면 밖 화살표에도 같은 목표 표식 (클리어한 갈래는 빠짐)
+//  [변경] 뇌문: 허브의 각 갈래 문 앞(아직 안 깬 곳) · 깬 갈래 방 가운데에 번개 문 → E로 바로 이동 (긴 통로를 오가지 않게)
+//  [변경] 날씨: 비 + 번개 · 천둥 (DungeonWeather)
 public class DungeonDirector : MonoBehaviour
 {
     public const string ClearedFlag = "DungeonCleared";
@@ -21,7 +25,11 @@ public class DungeonDirector : MonoBehaviour
     [SerializeField] Font font;
     [SerializeField] HUDNavigationElementSettings markerSettings; // 본편 구역 목표와 같은 설정 (Nav_Objective)
     [SerializeField] float refreshInterval = 0.2f;
-    [SerializeField] float roomRadius = 21f; // [변경] 이 안에 들어오면 그 방에 온 것으로 봄 (벽 반지름 19 + 여유)
+    [SerializeField] float roomRadius = 21f; // 이 안에 들어오면 그 방에 온 것으로 봄 (벽 반지름 19 + 여유)
+    [SerializeField] float hubGateDistance = 11f;    // [변경] 허브 가운데에서 각 갈래 문 쪽으로 이만큼 → 뇌문 자리
+    [SerializeField] float branchArrive = 17.5f;     // [변경] 갈래 방 가운데에서 입구 쪽으로 이만큼 → 도착 자리 (전투 시작 범위 바로 밖)
+    [SerializeField] float hubArrive = 8f;           // [변경] 허브로 돌아올 때 그 갈래 문 쪽 이만큼
+    [SerializeField] float gateRange = 2.4f;
 
     static readonly Color Gold = new Color(0.95f, 0.8f, 0.45f);
 
@@ -51,6 +59,8 @@ public class DungeonDirector : MonoBehaviour
         if (exitMarker != null) exitNav = CreateMarker("Nav_Exit", exitMarker.transform.position);
 
         BuildUi();
+        BuildGates(); // [변경]
+        gameObject.AddComponent<DungeonWeather>(); // [변경]
         UpdateObjective();
     }
 
@@ -102,7 +112,7 @@ public class DungeonDirector : MonoBehaviour
     }
 
     // 핵심: 지금 갈 수 있는 목표만 보여 줌 (깬 갈래는 빼고, 남은 곳은 거리와 함께)
-    // [변경] 아직 안 깬 갈래 방에 들어와 있거나 어디서든 웨이브 중이면 그곳만 보여 주고 다른 갈림길 표식은 숨김
+    // 아직 안 깬 갈래 방에 들어와 있거나 어디서든 웨이브 중이면 그곳만 보여 주고 다른 갈림길 표식은 숨김
     void UpdateObjective()
     {
         if (objective == null) return;
@@ -122,7 +132,7 @@ public class DungeonDirector : MonoBehaviour
             lines.Append($"협곡 중앙의 {miniBossName}을 쓰러뜨려라");
             if (fighting != hub) lines.Append($"   {Distance(hub.transform.position)}");
         }
-        else if (focus != null) // [변경] 그 방의 목표만
+        else if (focus != null) // 그 방의 목표만
         {
             lines.Append($"봉인 해제  {done.Count} / {branches.Count}");
             lines.Append(focus == fighting ? $"\n{focus.DisplayName}   전투 중" : $"\n{focus.DisplayName}");
@@ -140,13 +150,13 @@ public class DungeonDirector : MonoBehaviour
         {
             if (pair.Value == null) continue;
             bool show = pair.Key == hub ? hubOpen : !done.Contains(pair.Key) && !finished && !hubOpen;
-            show &= focus == null; // [변경] 방 안 · 웨이브 중엔 나침반 · 화살표 표식 전부 숨김
+            show &= focus == null; // 방 안 · 웨이브 중엔 나침반 · 화살표 표식 전부 숨김
             if (pair.Value.activeSelf != show) pair.Value.SetActive(show);
         }
         if (exitNav != null && exitNav.activeSelf != finished) exitNav.SetActive(finished);
     }
 
-    // [변경] 아직 안 깬 갈래 방 안에 서 있으면 그 방
+    // 아직 안 깬 갈래 방 안에 서 있으면 그 방
     ZoneArena CurrentRoom()
     {
         if (player == null) return null;
@@ -176,6 +186,7 @@ public class DungeonDirector : MonoBehaviour
 
     void Update()
     {
+        UpdateGates(); // [변경]
         refreshTimer -= Time.unscaledDeltaTime;
         if (refreshTimer <= 0f) // 거리 · 전투 중 표시 갱신
         {
@@ -206,5 +217,191 @@ public class DungeonDirector : MonoBehaviour
         banner.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(2f, -2f);
         bannerGroup = banner.gameObject.AddComponent<CanvasGroup>();
         bannerGroup.alpha = 0f;
+
+        // [변경] 뇌문 안내 (화면 아래 가운데) · 이동할 때 번쩍이는 막
+        prompt = UIKit.Text(canvas.transform, "", font, 28, Color.white, TextAnchor.MiddleCenter);
+        RectTransform p = prompt.rectTransform;
+        p.anchorMin = p.anchorMax = new Vector2(0.5f, 0f);
+        p.anchoredPosition = new Vector2(0f, 200f);
+        p.sizeDelta = new Vector2(1000f, 44f);
+        prompt.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(2f, -2f);
+        warpFlash = UIKit.Image(canvas.transform, null, new Color(0.8f, 0.9f, 1f, 0f));
+        warpFlash.raycastTarget = false;
+        UIKit.Stretch(warpFlash.rectTransform);
+    }
+
+    // ===== [변경] 뇌문 (갈래 방 ↔ 허브 바로 이동) =====
+    class Gate
+    {
+        public ZoneArena branch;
+        public bool toBranch;      // true = 허브 → 갈래, false = 깬 갈래 → 허브
+        public Vector3 position, destination;
+        public float destinationYaw;
+        public GameObject visual;
+    }
+
+    readonly List<Gate> gates = new List<Gate>();
+    Text prompt;
+    Image warpFlash;
+    Gate nearGate;
+    bool warping;
+    AudioSource warpSource;
+
+    void BuildGates()
+    {
+        if (hub == null) return;
+        Vector3 c = hub.transform.position;
+        foreach (ZoneArena b in branches)
+        {
+            if (b == null) continue;
+            Vector3 dir = b.transform.position - c;
+            dir.y = 0f;
+            dir.Normalize();
+            float yawIn = Quaternion.LookRotation(dir).eulerAngles.y;
+            gates.Add(NewGate(b, true, c + dir * hubGateDistance, b.transform.position - dir * branchArrive, yawIn));
+            gates.Add(NewGate(b, false, b.transform.position, c + dir * hubArrive, yawIn + 180f));
+        }
+        warpSource = gameObject.AddComponent<AudioSource>();
+        warpSource.spatialBlend = 0f;
+        warpSource.clip = Resources.Load<AudioClip>("Audio/Weather/warp");
+    }
+
+    Gate NewGate(ZoneArena branch, bool toBranch, Vector3 position, Vector3 destination, float yaw)
+    {
+        position = Ground(position);
+        var gate = new Gate { branch = branch, toBranch = toBranch, position = position, destination = Ground(destination), destinationYaw = yaw };
+        gate.visual = GateVisual(position);
+        gate.visual.SetActive(false);
+        return gate;
+    }
+
+    // 지금 쓸 수 있는 문: 전투 중 · 던전을 다 깬 뒤엔 전부 닫힘. 허브 → 아직 안 깬 갈래만, 갈래 → 허브는 그 갈래를 깬 뒤에만
+    bool GateOpen(Gate g)
+    {
+        if (ZoneArena.Fighting != null || RunState.HasFlag(ClearedFlag)) return false;
+        bool cleared = done.Contains(g.branch);
+        return g.toBranch ? !cleared : cleared;
+    }
+
+    void UpdateGates()
+    {
+        nearGate = null;
+        float best = gateRange * gateRange;
+        foreach (Gate g in gates)
+        {
+            bool open = GateOpen(g);
+            if (g.visual.activeSelf != open) g.visual.SetActive(open);
+            if (!open || player == null) continue;
+            Vector3 d = player.position - g.position;
+            d.y = 0f;
+            if (d.sqrMagnitude <= best)
+            {
+                best = d.sqrMagnitude;
+                nearGate = g;
+            }
+        }
+        if (prompt != null)
+            prompt.text = nearGate == null || warping ? "" : nearGate.toBranch ? $"E   뇌문 — {nearGate.branch.DisplayName}" : "E   뇌문 — 협곡 중앙으로";
+
+        Keyboard kb = Keyboard.current;
+        if (nearGate != null && !warping && !GamePause.IsPaused && kb != null && kb.eKey.wasPressedThisFrame)
+            StartCoroutine(Warp(nearGate));
+    }
+
+    // 핵심: 번쩍 → 화면이 하얀 동안 위치 · 카메라를 옮김 → 도착 자리에 낙뢰와 함께 나타남
+    IEnumerator Warp(Gate g)
+    {
+        warping = true;
+        if (warpSource != null && warpSource.clip != null) warpSource.PlayOneShot(warpSource.clip, AudioOptions.SfxVolume);
+        ZoneArena.NotifyEnemySpawned(g.position); // 적 등장 낙뢰 연출 재사용
+        for (float t = 0f; t < 0.12f; t += Time.unscaledDeltaTime)
+        {
+            warpFlash.color = new Color(0.8f, 0.9f, 1f, t / 0.12f);
+            yield return null;
+        }
+        warpFlash.color = new Color(0.8f, 0.9f, 1f, 1f);
+
+        var cc = player.GetComponent<CharacterController>();
+        if (cc != null) cc.enabled = false;
+        player.SetPositionAndRotation(g.destination, Quaternion.Euler(0f, g.destinationYaw, 0f));
+        if (cc != null) cc.enabled = true;
+        ThirdPersonCamera cam = FindAnyObjectByType<ThirdPersonCamera>();
+        if (cam != null) cam.Snap(g.destinationYaw);
+        yield return null;
+        ZoneArena.NotifyEnemySpawned(g.destination);
+
+        for (float t = 0f; t < 0.35f; t += Time.unscaledDeltaTime)
+        {
+            warpFlash.color = new Color(0.8f, 0.9f, 1f, 1f - t / 0.35f);
+            yield return null;
+        }
+        warpFlash.color = new Color(0.8f, 0.9f, 1f, 0f);
+        warping = false;
+    }
+
+    static Vector3 Ground(Vector3 p)
+    {
+        float best = float.MaxValue;
+        foreach (RaycastHit hit in Physics.RaycastAll(p + Vector3.up * 30f, Vector3.down, 60f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (hit.collider.GetComponentInParent<CharacterController>() != null || hit.distance >= best) continue;
+            best = hit.distance;
+            p.y = hit.point.y;
+        }
+        return p;
+    }
+
+    // 바닥의 번개 고리 + 위로 오르는 불티 + 푸른 빛
+    GameObject GateVisual(Vector3 position)
+    {
+        var root = new GameObject("ThunderGate");
+        root.transform.SetParent(transform, false);
+        root.transform.position = position;
+        var mat = new Material(Shader.Find("Sprites/Default"));
+
+        var ring = new GameObject("Ring").AddComponent<LineRenderer>();
+        ring.transform.SetParent(root.transform, false);
+        ring.sharedMaterial = mat;
+        ring.useWorldSpace = false;
+        ring.loop = true;
+        ring.widthMultiplier = 0.08f;
+        ring.startColor = ring.endColor = new Color(0.6f, 0.82f, 1f, 0.9f);
+        const int Segments = 48;
+        ring.positionCount = Segments;
+        for (int i = 0; i < Segments; i++)
+        {
+            float a = i * Mathf.PI * 2f / Segments;
+            ring.SetPosition(i, new Vector3(Mathf.Cos(a) * 1.4f, 0.08f, Mathf.Sin(a) * 1.4f));
+        }
+
+        var ps = new GameObject("Sparks").AddComponent<ParticleSystem>();
+        ps.transform.SetParent(root.transform, false);
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        ParticleSystem.MainModule main = ps.main;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.6f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 3f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
+        main.startColor = new Color(0.7f, 0.88f, 1f);
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        ParticleSystem.ShapeModule shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Circle;
+        shape.radius = 1.3f;
+        shape.rotation = new Vector3(-90f, 0f, 0f); // 위로 뿜음
+        ParticleSystem.EmissionModule em = ps.emission;
+        em.rateOverTime = 30f;
+        var pr = ps.GetComponent<ParticleSystemRenderer>();
+        pr.sharedMaterial = mat;
+        pr.renderMode = ParticleSystemRenderMode.Stretch;
+        pr.velocityScale = 0.06f;
+        ps.Play();
+
+        var glow = new GameObject("Glow").AddComponent<Light>();
+        glow.transform.SetParent(root.transform, false);
+        glow.transform.localPosition = Vector3.up * 1f;
+        glow.type = LightType.Point;
+        glow.color = new Color(0.55f, 0.75f, 1f);
+        glow.range = 6f;
+        glow.intensity = 2.5f;
+        return root;
     }
 }

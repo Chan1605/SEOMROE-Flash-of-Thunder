@@ -23073,14 +23073,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 118300998889972725, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 1285893297518870779, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
     - target: {fileID: 1391606783692858250, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
       propertyPath: m_Name
       value: Player
@@ -23125,38 +23117,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2336979120302626365, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 3070939792974395059, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 4005965994054678145, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 4353746522782798047, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 5087689224789762330, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 6301437402645275699, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 8033109656775331062, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: followCamera
-      value: 
-      objectReference: {fileID: 330585548}
-    - target: {fileID: 8946055058242759463, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: cameraTransform
-      value: 
-      objectReference: {fileID: 330585546}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
