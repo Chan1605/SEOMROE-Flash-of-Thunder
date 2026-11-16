@@ -2,7 +2,10 @@ using UnityEngine;
 
 // 플레이어 효과음. 전투·스킬 이벤트를 받아 소리만 담당 (PlayerVfx와 같은 방식)
 //  - 휘두르기: 매 공격마다 바람 소리. 판정이 켜지는 순간에 소리 정점이 오도록 지연 재생 (공속 반영)
+//    [변경] 적을 베면 바람 소리는 바로 줄여 끔 → 베는 소리만 들림 (예전엔 두 소리가 겹쳐 남)
 //  - 베기: 칼이 적에게 맞았을 때 위에 겹침. 한 번에 여럿을 베도 한 번만
+//  - 타격음 3겹: 베는 소리 + 살 맞는 둔탁한 소리 + 저음 쿵(강한 공격일수록 큼) → 가벼운 느낌 보완
+//  - 발소리: PlayerFootsteps를 실행 중에 붙여 발이 땅에 닿을 때마다
 //  - Q 차지: 누르는 순간부터 반복음 (일반 차지·풀차지·발도 자세 모두). 차지 단계·표식이 찰수록 커지고 높아짐
 //  - 우클릭 차지 강타도 같은 반복음 (단계에 따라 커지고 높아짐)
 //  - 발도 자세 진입: 진입음을 반복음 위에 겹쳐 한 번 (반복음은 끊기지 않음)
@@ -30,6 +33,19 @@ public class PlayerSfx : MonoBehaviour
     [SerializeField] float heavyPitch = 0.9f;     // 강한 공격은 조금 낮고 묵직하게
     [SerializeField] float hitSoundInterval = 0.06f; // 이 시간 안에 여러 명을 베면 한 번만
 
+    [Header("Hit Layers")] // 베는 소리 아래 깔리는 두 겹
+    [SerializeField] AudioClip[] hitBodyClips;   // 살 맞는 둔탁한 소리
+    [SerializeField, Range(0f, 1f)] float hitBodyVolume = 0.7f;
+    [SerializeField] AudioClip[] hitThumpClips;  // 저음 쿵
+    [SerializeField, Range(0f, 1f)] float hitThumpVolume = 0.85f;
+    [SerializeField, Range(0f, 1f)] float lightThumpScale = 0.35f; // 약공격은 쿵을 작게
+
+    [Header("Footsteps")]
+    [SerializeField] AudioClip[] footstepClips;
+    [SerializeField, Range(0f, 1f)] float footstepVolume = 0.55f;
+    [SerializeField] Vector2 footstepPitch = new Vector2(0.92f, 1.08f);
+    [SerializeField] float footstepFullSpeed = 6f; // 이 빠르기(달리기)에서 가장 큼
+
     [Header("Charge / Draw Stance")]
     [SerializeField] AudioClip stanceStart;
     [SerializeField] AudioClip stanceLoop;
@@ -52,6 +68,8 @@ public class PlayerSfx : MonoBehaviour
     [SerializeField, Range(0f, 1f)] float strikeExtraVolume = 0.5f;
 
     AudioSource oneShot;
+    AudioSource bodySource, thumpSource;
+    int lastBody = -1, lastThump = -1;
     AudioSource swingSource; // 종류마다 소스를 나눔 (한 소스의 피치를 바꾸면 이미 울리는 소리까지 바뀜)
     AudioSource dashSource;
     AudioSource[] strikeSources; // 덧붙는 낙뢰음은 예약 재생이 필요해 소스를 따로 둠
@@ -60,6 +78,7 @@ public class PlayerSfx : MonoBehaviour
     AudioSource stanceLoopSource;
 
     int lastSwing = -1;
+    float airFade = -1f; // [변경] 0 이상이면 바람 소리를 줄이는 중
     int lastAirSwing = -1;
     int lastDashCut = -1;
     AttackData pendingSwing;
@@ -83,6 +102,10 @@ public class PlayerSfx : MonoBehaviour
         if (weapon == null) weapon = GetComponentInChildren<WeaponHitbox>(true);
 
         oneShot = CreateSource("Sfx_OneShot", false);
+        bodySource = CreateSource("Sfx_HitBody", false);
+        thumpSource = CreateSource("Sfx_HitThump", false);
+        if (footstepClips != null && footstepClips.Length > 0 && GetComponent<PlayerFootsteps>() == null)
+            gameObject.AddComponent<PlayerFootsteps>().Init(footstepClips, footstepVolume, footstepPitch, footstepFullSpeed);
         swingSource = CreateSource("Sfx_Swing", false);
         dashSource = CreateSource("Sfx_DashCut", false);
         stanceStartSource = CreateSource("Sfx_StanceStart", false);
@@ -148,6 +171,7 @@ public class PlayerSfx : MonoBehaviour
 
     void Update()
     {
+        UpdateAirFade();
         UpdateAirSwing();
         UpdateCharge();
     }
@@ -177,10 +201,30 @@ public class PlayerSfx : MonoBehaviour
     {
         pendingTimer = -1f;
         if (pendingSwing == null) return;
+        airFade = -1f;
+        swingSource.volume = 1f;
         AudioClip clip = Pick(airSwingClips, ref lastAirSwing);
         if (clip == null) return;
         swingSource.pitch = Random.Range(airSwingPitch.x, airSwingPitch.y) * (pendingHeavy ? heavyPitch : 1f);
         swingSource.PlayOneShot(clip, airSwingVolume * AudioOptions.SfxVolume);
+    }
+
+    // [변경] 적중 순간 바람 소리를 0.04초 만에 줄여 끔 (뚝 끊기는 소리가 나지 않게) · 아직 예약 중이면 취소
+    void SilenceAirSwing()
+    {
+        pendingTimer = -1f;
+        if (swingSource.isPlaying) airFade = 0f;
+    }
+
+    void UpdateAirFade()
+    {
+        if (airFade < 0f) return;
+        airFade += Time.unscaledDeltaTime / 0.04f;
+        swingSource.volume = Mathf.Clamp01(1f - airFade);
+        if (airFade < 1f) return;
+        swingSource.Stop();
+        swingSource.volume = 1f;
+        airFade = -1f;
     }
 
     // ===== 일섬 돌진 =====
@@ -234,7 +278,9 @@ public class PlayerSfx : MonoBehaviour
     // ===== 적중 =====
     void OnWeaponHit(IDamageable target, DamageInfo info, HitResult result)
     {
-        if (result != HitResult.Hit || swingClips == null || swingClips.Length == 0) return;
+        if (result != HitResult.Hit) return;
+        SilenceAirSwing(); // [변경] 베었으면 허공 소리는 끔
+        if (swingClips == null || swingClips.Length == 0) return;
         if (Time.unscaledTime - lastHitTime < hitSoundInterval) return;
         lastHitTime = Time.unscaledTime;
 
@@ -246,6 +292,18 @@ public class PlayerSfx : MonoBehaviour
         bool heavy = info.Weight != AttackWeight.Light;
         oneShot.pitch = Random.Range(swingPitch.x, swingPitch.y) * (heavy ? heavyPitch : 1f);
         oneShot.PlayOneShot(swingClips[i], swingVolume * AudioOptions.SfxVolume);
+
+        // 아래 두 겹: 살 맞는 소리는 항상, 저음 쿵은 강한 공격에서 크게
+        PlayLayer(bodySource, hitBodyClips, ref lastBody, hitBodyVolume, heavy ? 0.85f : 1f);
+        PlayLayer(thumpSource, hitThumpClips, ref lastThump, hitThumpVolume * (heavy ? 1f : lightThumpScale), heavy ? 0.9f : 1.05f);
+    }
+
+    void PlayLayer(AudioSource source, AudioClip[] clips, ref int last, float volume, float basePitch)
+    {
+        AudioClip clip = Pick(clips, ref last);
+        if (clip == null || volume <= 0f) return;
+        source.pitch = basePitch * Random.Range(0.95f, 1.05f);
+        source.PlayOneShot(clip, volume * AudioOptions.SfxVolume);
     }
 
     // ===== Q 차지 · 발도 자세 =====
@@ -305,7 +363,7 @@ public class PlayerSfx : MonoBehaviour
         if (heavyCharging) fill = Mathf.Max(fill, Mathf.Clamp01((heavyLevel - 1) / (float)Mathf.Max(1, heavyCharge.MaxLevel - 1))); // 1단계부터 시작
         if (stance)
         {
-            float marks = skill.StanceMarkCount / (float)skill.StanceMarkScale; // [변경] 각성 발도는 표식 제한이 없어 기준 수로 나눔
+            float marks = skill.StanceMarkCount / (float)skill.StanceMarkScale; // 각성 발도는 표식 제한이 없어 기준 수로 나눔
             fill = Mathf.Max(fill, Mathf.Clamp01((1f - skill.StanceRemaining01) * 0.6f + marks));
         }
 

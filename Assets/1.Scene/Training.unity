@@ -14175,6 +14175,7 @@ MonoBehaviour:
   font: {fileID: 12800000, guid: ca81aa27ea10c624487ee1849d77e491, type: 3}
   healDelay: 1.5
   reviveDelay: 2
+  bossPrefab: {fileID: 1051616137314594360, guid: 21cfbd02f8e96c047952156f1cdd5b4e, type: 3}
 --- !u!4 &969118477
 Transform:
   m_ObjectHideFlags: 0

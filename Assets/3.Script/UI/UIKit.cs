@@ -123,7 +123,7 @@ public static class UIKit
         return Sprite.Create(tex, new Rect(0, 0, width, 1), new Vector2(0f, 0.5f), 100f);
     }
 
-    // [변경] 타이틀 · 설정 메뉴 공용 붓질 한 획 (TitleScreen에서 옮김): 왼쪽에서 진하게 시작해 오른쪽으로 갈수록 가늘어지며 갈라짐
+    // 타이틀 · 메뉴 공용 붓질 한 획: 왼쪽에서 진하게 시작해 오른쪽으로 갈수록 가늘어지며 갈라짐
     public static Sprite BrushStroke(int w, int h)
     {
         var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
@@ -149,5 +149,52 @@ public static class UIKit
         tex.SetPixels32(pixels);
         tex.Apply();
         return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0f, 0.5f), 100f);
+    }
+
+    // ===== [변경] 공용 스타일 (타이틀 · 설정 · 스킬트리 · 결과 · 로딩이 같은 모양을 쓰도록) =====
+    public static readonly Color Gold = new Color(0.95f, 0.8f, 0.45f);
+
+    static Sprite gradient, brush;
+    public static Sprite SharedGradient => gradient != null ? gradient : gradient = Gradient(256);
+    public static Sprite SharedBrush => brush != null ? brush : brush = BrushStroke(512, 96);
+
+    // 세리프(Cinzel) 글꼴: 씬의 설정 메뉴에 연결된 것을 빌려 씀. 없으면 fallback (Cinzel에는 한글이 없으니 영문에만)
+    public static Font DisplayFont(Font fallback)
+    {
+        SettingsMenu settings = UnityEngine.Object.FindAnyObjectByType<SettingsMenu>(FindObjectsInactive.Include);
+        Font font = settings != null ? settings.DisplayFont : null;
+        return font != null ? font : fallback;
+    }
+
+    // 45도 돌린 작은 사각형. cx·cy는 중심 (좌상단 기준 픽셀)
+    public static Image Diamond(Transform parent, float cx, float cy, float size, Color color)
+    {
+        Image gem = Image(parent, null, color);
+        gem.raycastTarget = false;
+        RectTransform r = gem.rectTransform;
+        r.anchorMin = r.anchorMax = new Vector2(0f, 1f);
+        r.pivot = new Vector2(0.5f, 0.5f);
+        r.anchoredPosition = new Vector2(cx, -cy);
+        r.sizeDelta = new Vector2(size, size);
+        r.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        return gem;
+    }
+
+    // ◆── 장식선: 마름모에서 시작해 오른쪽으로 사라지는 금빛 선. x는 마름모 왼쪽 끝
+    public static void Ornament(Transform parent, float x, float y, float width, Color color)
+    {
+        Diamond(parent, x + 4.5f, y, 9f, color);
+        Image line = Image(parent, SharedGradient, new Color(color.r, color.g, color.b, color.a * 0.75f));
+        line.raycastTarget = false;
+        Place(line.rectTransform, x + 16f, y, width, 2f);
+    }
+
+    // 고른 항목 뒤에 깔리는 붓질
+    public static Image BrushBehind(Transform parent, float x, float y, float width, float height, Color color)
+    {
+        Image b = Image(parent, SharedBrush, color);
+        b.raycastTarget = false;
+        Place(b.rectTransform, x, y, width, height);
+        return b;
     }
 }

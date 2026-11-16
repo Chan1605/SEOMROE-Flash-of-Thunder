@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 
 // 본편 한 판의 전투 기록 + 보스 처치 시 결과 화면 띄우기
 // 구역(ZoneArena)이 있는 씬이 열리면 자동으로 생김 (수련장 · 타이틀 제외)
-// [변경] 씬을 넘어가도 유지 (본편 → 던전 → 본편이 한 판). 구역이 없는 씬(타이틀 · 연습장 · 수련장)으로 가면 기록을 버림
+// 씬을 넘어가도 유지 (본편 → 던전 → 본편이 한 판). 구역이 없는 씬(타이틀 · 연습장 · 수련장)으로 가면 기록을 버림
 public class RunRecord : MonoBehaviour
 {
     // ===== 랭크 기준 (100점 만점) =====
@@ -60,7 +60,7 @@ public class RunRecord : MonoBehaviour
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (mode != LoadSceneMode.Single || scene.name == SceneTransition.LoadingScene) return;
-        if (Instance != null) // [변경] 이어지는 판이면 새 씬의 플레이어에 다시 연결, 아니면 끝
+        if (Instance != null) // 이어지는 판이면 새 씬의 플레이어에 다시 연결, 아니면 끝
         {
             if (IsRunScene()) Instance.Bind();
             else Destroy(Instance.gameObject);
@@ -69,13 +69,14 @@ public class RunRecord : MonoBehaviour
         TryCreate();
     }
 
-    static bool IsRunScene() => TutorialDirector.Instance == null && FindAnyObjectByType<ZoneArena>() != null;
+    static bool IsRunScene() => TutorialDirector.Instance == null && FindAnyObjectByType<ZoneArena>() != null
+        && FindAnyObjectByType<TrainingMode>() == null; // [변경] 연습장(보스 1:1 포함)은 기록 · 결과 화면 없음
 
     static void TryCreate()
     {
         if (Instance != null || !IsRunScene()) return; // 이미 있음(첫 씬에서 두 경로가 겹칠 때) · 수련장 · 구역 없는 씬
         var go = new GameObject("RunRecord");
-        DontDestroyOnLoad(go); // [변경]
+        DontDestroyOnLoad(go);
         go.AddComponent<RunRecord>();
         go.AddComponent<ResultScreen>();
         Debug.Log("[Result] 기록 시작"); // 생성 확인용
@@ -89,7 +90,7 @@ public class RunRecord : MonoBehaviour
         Bind();
     }
 
-    // [변경] 지금 씬의 플레이어 컴포넌트에 연결 (씬이 바뀌면 다시 호출)
+    // 지금 씬의 플레이어 컴포넌트에 연결 (씬이 바뀌면 다시 호출)
     void Bind()
     {
         Unbind();
@@ -129,7 +130,7 @@ public class RunRecord : MonoBehaviour
     // 실제 흐른 시간 (히트스톱·슬로와 무관), 일시정지 · 메뉴 중엔 멈춤
     void Update()
     {
-        if (!Completed && !GamePause.IsPaused && !SceneTransition.Busy) PlayTime += Time.unscaledDeltaTime; // [변경] 씬 전환 · 로딩 시간 제외
+        if (!Completed && !GamePause.IsPaused && !SceneTransition.Busy) PlayTime += Time.unscaledDeltaTime; // 씬 전환 · 로딩 시간 제외
     }
 
     void OnDamaged(DamageInfo info) { if (!Completed) HitsTaken++; }

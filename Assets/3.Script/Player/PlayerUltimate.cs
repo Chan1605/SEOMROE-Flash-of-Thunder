@@ -41,6 +41,8 @@ public partial class PlayerUltimate : MonoBehaviour
     [SerializeField] AudioClip slashClip;
     [SerializeField] AudioClip chargeClip;
     [SerializeField] AudioClip clashClip;
+    [SerializeField] AudioClip heavensCutClip;    // 천뢰일섬: 화면에 베인 선이 그어질 때
+    [SerializeField] AudioClip heavensFinishClip; // 천뢰일섬: 조각이 어긋나며 낙뢰가 떨어질 때 (비우면 천둥)
 
     static readonly string[] Names = { "", "雷雲落雷陣", "天雷一閃", "雷神降臨" };
     static readonly string[] Readings = { "", "뇌운낙뢰진", "천뢰일섬", "뇌신강림" };
@@ -133,7 +135,7 @@ public partial class PlayerUltimate : MonoBehaviour
         if (Bars > before) OnBarFilled(Bars);
     }
 
-    // 칸이 찰 때 신호: 몸에 번개가 감기고 소리. 3칸째는 크게
+    // 칸이 찰 때 신호: 몸에 번개가 감김. 3칸째는 크게 (소리 없음)
     void OnBarFilled(int bars)
     {
         if (hud != null) hud.Ready(bars);
@@ -145,8 +147,7 @@ public partial class PlayerUltimate : MonoBehaviour
             Vector2 a = Random.insideUnitCircle.normalized * Random.Range(0.6f, 1.4f);
             Arc(transform.position + new Vector3(a.x, 0.05f, a.y), Chest + Vector3.up * Random.Range(-0.3f, 0.6f));
         }
-        Sound(clashClip, full ? 0.7f : 0.4f, full ? 1.5f : 1.25f);
-        if (full && followCamera != null) followCamera.Shake(0.08f, 0.15f);
+        if (full && followCamera != null) followCamera.Shake(0.08f, 0.15f); // [변경] 칸이 찰 때 나던 소리는 뺌
     }
 
     void Update()
@@ -347,7 +348,7 @@ public partial class PlayerUltimate : MonoBehaviour
             Weight = AttackWeight.Skill,
             BreakArmor = true,
             InstantKill = instantKill && !boss,
-            ForceKill = instantKill && !boss, // [변경] 정예 · 방패병 · 돌격병도 궁극기엔 즉사
+            ForceKill = instantKill && !boss, // 정예 · 방패병 · 돌격병도 궁극기엔 즉사
             HitPoint = enemy.transform.position + Vector3.up,
             Direction = Flat(enemy.transform.position - transform.position).normalized
         };

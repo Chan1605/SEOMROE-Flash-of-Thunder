@@ -8,12 +8,13 @@ using UnityEngine.SceneManagement;
 //  1) 처음 한 번: SampleScene을 복사해 Training.unity로 (플레이어 · 카메라 · HUD · 메뉴 그대로)
 //  2) 본편 구역 · 적을 지우고 수련장과 같은 겉모습의 마당 하나 생성 (출구 없이 닫힌 마당)
 //  3) 허수아비 5 (앞쪽 줄) + 공격하는 수련 상대 3 (서 · 동 · 북, 각자 자기 자리 근처에서만 싸움)
-//  4) 스킬트리 전부 해금(패시브 포함) + TrainingMode(뇌기 무한 · 체력 회복) + 녹화 모드(F10) + 빌드 설정
+//  4) 스킬트리 전부 해금(패시브 포함) + TrainingMode(뇌기 무한 · 체력 회복 · F5 보스 1:1) + 녹화 모드(F10) + 빌드 설정
 public static class TrainingSceneSetup
 {
     const string ScenePath = "Assets/1.Scene/Training.unity";
     const string ThemePath = "Assets/11.Data/Zone/Training_Yard.asset";
     const float SparLeash = 5f;
+    const string BossPrefabPath = "Assets/2.Model/Prefabs/Swordsman_Boss.prefab"; // [변경] 보스 1:1
 
     [MenuItem("Tools/Setup/Training Scene")]
     static void Run()
@@ -75,6 +76,7 @@ public static class TrainingSceneSetup
         if (mode == null) mode = new GameObject("TrainingMode").AddComponent<TrainingMode>();
         var m = new SerializedObject(mode);
         m.FindProperty("font").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Font>(TutorialSceneSetup.BodyFontPath);
+        m.FindProperty("bossPrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(BossPrefabPath); // [변경]
         m.ApplyModifiedPropertiesWithoutUndo();
         TutorialSceneSetup.EnsureRecordingMode();
 

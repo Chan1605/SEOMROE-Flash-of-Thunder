@@ -3,12 +3,13 @@ using UnityEditor;
 using UnityEngine;
 
 // Player에 PlayerSfx를 붙이고 Assets/8.Audio/SFX/Player의 소리를 연결 (다시 실행해도 됨, 볼륨 등 조절값은 유지)
-//  - [변경] air_swing_*.wav 전부 → 휘두르기(허공) 바람 소리
-//  - sword_swing_*.wav 전부 → 적중 소리 변형
-//  - [변경] dash_cut_*.wav 전부 → 일섬 돌진(표식한 적을 지나갈 때)
+//  - [변경] air_slash_*.wav 전부 → 허공을 벨 때 (예전 air_swing_*는 안 씀)
+//  - [변경] hit_slice_*.wav 전부 → 적을 벨 때 (예전 sword_swing_*는 안 씀)
+//  - dash_cut_*.wav 전부 → 일섬 돌진(표식한 적을 지나갈 때)
 //  - stance_charge_start / stance_charge_loop → 발도 자세 진입 / Q 차지 반복
 //  - skill_strike_*.wav 전부 → 일섬 적중 낙뢰
 //  - parry_clash.wav → ParryFx의 칼 부딪힘 소리 (비어 있을 때만, 패링·간파 공용)
+//  - hit_body_* / hit_thump_* → 타격음 아래 두 겹, footstep_* → 발소리
 // 진입음은 처음 실행할 때만 연결 (인스펙터에서 바꾼 소리를 덮어쓰지 않음)
 public static class PlayerSfxSetup
 {
@@ -24,16 +25,19 @@ public static class PlayerSfxSetup
             return;
         }
 
-        AudioClip[] swings = LoadAll("sword_swing_");
+        AudioClip[] swings = LoadAll("hit_slice_"); // [변경]
         AudioClip[] strikes = LoadAll("skill_strike_");
-        AudioClip[] airSwings = LoadAll("air_swing_"); // [변경]
+        AudioClip[] airSwings = LoadAll("air_slash_"); // [변경]
         AudioClip[] dashCuts = LoadAll("dash_cut_");
         var parryClash = AssetDatabase.LoadAssetAtPath<AudioClip>(Folder + "/parry_clash.wav");
+        AudioClip[] hitBodies = LoadAll("hit_body_");
+        AudioClip[] hitThumps = LoadAll("hit_thump_");
+        AudioClip[] footsteps = LoadAll("footstep_");
         var start = AssetDatabase.LoadAssetAtPath<AudioClip>(Folder + "/stance_charge_start.wav");
         var loop = AssetDatabase.LoadAssetAtPath<AudioClip>(Folder + "/stance_charge_loop.wav");
 
         // 반복음은 메모리에 풀어 두고(끊김 방지), 짧은 휘두르기도 바로 재생되게
-        foreach (AudioClip clip in swings.Concat(strikes).Concat(airSwings).Concat(dashCuts).Append(start).Append(loop).Append(parryClash).Where(c => c != null))
+        foreach (AudioClip clip in swings.Concat(strikes).Concat(airSwings).Concat(dashCuts).Concat(hitBodies).Concat(hitThumps).Concat(footsteps).Append(start).Append(loop).Append(parryClash).Where(c => c != null))
         {
             var importer = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(clip)) as AudioImporter;
             if (importer == null) continue;
@@ -50,7 +54,7 @@ public static class PlayerSfxSetup
             if (sfx == null) sfx = root.AddComponent<PlayerSfx>();
 
             var so = new SerializedObject(sfx);
-            so.FindProperty("combat").objectReferenceValue = root.GetComponent<PlayerCombat>(); // [변경]
+            so.FindProperty("combat").objectReferenceValue = root.GetComponent<PlayerCombat>();
             so.FindProperty("stats").objectReferenceValue = root.GetComponent<PlayerStats>();
             so.FindProperty("skill").objectReferenceValue = root.GetComponent<PlayerSkill>();
             so.FindProperty("heavyCharge").objectReferenceValue = root.GetComponent<PlayerChargeAttack>();
@@ -62,8 +66,11 @@ public static class PlayerSfxSetup
             SerializedProperty startProp = so.FindProperty("stanceStart");
             if (startProp.objectReferenceValue == null) startProp.objectReferenceValue = start;
             so.FindProperty("stanceLoop").objectReferenceValue = loop;
-            SetArray(so, "airSwingClips", airSwings); // [변경]
+            SetArray(so, "airSwingClips", airSwings);
             SetArray(so, "dashCutClips", dashCuts);
+            SetArray(so, "hitBodyClips", hitBodies);
+            SetArray(so, "hitThumpClips", hitThumps);
+            SetArray(so, "footstepClips", footsteps);
             SerializedProperty strikeArray = so.FindProperty("strikeClips");
             strikeArray.arraySize = strikes.Length;
             for (int i = 0; i < strikes.Length; i++) strikeArray.GetArrayElementAtIndex(i).objectReferenceValue = strikes[i];
@@ -96,7 +103,7 @@ public static class PlayerSfxSetup
         .Where(c => c != null)
         .ToArray();
 
-    static void SetArray(SerializedObject so, string field, AudioClip[] clips) // [변경]
+    static void SetArray(SerializedObject so, string field, AudioClip[] clips)
     {
         SerializedProperty array = so.FindProperty(field);
         array.arraySize = clips.Length;

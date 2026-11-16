@@ -4,7 +4,7 @@ using UnityEngine;
 
 // 2칸 · 천뢰일섬(天雷一閃): 세상이 멈추고 흑백 → 카메라가 돌며 칼에 번개가 모임 → 단 한 번, 정면을 길게 가름
 //  → 옆에서 본 정지 화면이 실선으로 베임 → 일섬처럼 납도, 칼이 들어가는 순간 두 조각으로 어긋나며(UltimateFx.Cut) 선 위의 모든 적에게 낙뢰
-//  베기 직전엔 소리를 눌러 정적 → 베는 순간 소리가 돌아오며 칼 소리 + 낮은 천둥
+//  베기 직전엔 소리를 눌러 정적 → 베는 순간 칼 소리 → 화면이 갈릴 때 · 조각이 어긋날 때 전용 소리 (천둥은 연출과 안 어울려 뺌)
 public partial class PlayerUltimate
 {
     [Header("2 · 천뢰일섬")]
@@ -18,7 +18,7 @@ public partial class PlayerUltimate
     [SerializeField] float heavensSilence = 0.35f; // 베기 직전 정적 길이
     [SerializeField] float heavensDamage = 260f;
     [SerializeField] float heavensPosture = 120f;
-    [SerializeField] float heavensBossScale = 1.2f; // [변경] 보스 단일 대상 최강 (260×1.2 = 312)
+    [SerializeField] float heavensBossScale = 1.2f; // 보스 단일 대상 최강 (260×1.2 = 312)
 
     IEnumerator Heavens()
     {
@@ -65,14 +65,14 @@ public partial class PlayerUltimate
         if (sheathing && animator != null) animator.speed = heavensSheatheSpeed;
         else Play(ReleaseState, 0.02f);
         Duck(1f);
-        Sound(slashClip, 1f, 0.85f);
-        if (thunderClips != null && thunderClips.Length > 0) Sound(thunderClips[0], 0.7f, 0.55f); // 낮게 깔리는 천둥
+        Sound(slashClip, 1f, 0.85f); // [변경] 베는 순간은 원래 칼 소리, 낮은 천둥은 뺌
         Arc(start + Vector3.up * 1.1f, end + Vector3.up * 1.1f);
         if (followCamera != null) followCamera.BeginCinematic((start + end) * 0.5f + Vector3.up * 1.2f, Yaw + 90f, 8f, length * 0.75f + 4f); // 옆에서 본 정지 화면
         yield return new WaitForSecondsRealtime(0.18f); // 카메라가 자리를 잡은 화면을 찍어야 함
 
         // 화면 베기: 조각이 어긋나는 순간 색 · 시간이 돌아오고 선 위의 적에게 한꺼번에
         bool split = false;
+        if (heavensCutClip != null) Sound(heavensCutClip, 1f); // [변경] 화면이 갈릴 때 (skill1)
         fx.Cut(heavensCutAngle, heavensHold, () => split = true,
             () => !sheathing || stance.SheatheProgress < 0f || stance.SheatheProgress >= heavensSheatheAt); // 칼이 들어가는 순간
         while (!split) yield return null;
@@ -87,7 +87,8 @@ public partial class PlayerUltimate
             SkyStrike(e.transform.position, 14f, 3, 2.6f);
             Hit(e, heavensDamage, heavensPosture, heavensBossScale, true);
         }
-        Thunder(1f);
+        if (heavensFinishClip != null) Sound(heavensFinishClip, 1f); // [변경] 마지막 천둥 대신 (skill2)
+        else Thunder(1f);
         if (followCamera != null) followCamera.Shake(0.5f, 0.45f);
         yield return new WaitForSecondsRealtime(0.45f);
         fx.Flash(new Color(0.7f, 0.82f, 1f), 0.35f);

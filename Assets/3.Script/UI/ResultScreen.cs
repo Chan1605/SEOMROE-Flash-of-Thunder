@@ -4,19 +4,20 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 보스 처치 결과 화면 (RunRecord.Finished). 게임을 멈추고 기록을 한 줄씩 띄운 뒤 랭크를 찍음
+// [변경] 타이틀과 같은 모양: VICTORY(세리프) + ◆── 장식선 + "토벌 완료", 줄마다 마름모, 랭크 뒤 붓질
 //  - CONTINUE: 닫고 이어서 (시련의 터) · MAIN MENU: 타이틀로 (Title 씬이 빌드에 있을 때만)
 public class ResultScreen : MonoBehaviour
 {
-    static readonly Color Gold = new Color(0.95f, 0.8f, 0.45f);
+    static readonly Color Gold = UIKit.Gold;
     static readonly Color Bolt = new Color(0.62f, 0.82f, 1f);
     static readonly Color Dim = new Color(1f, 1f, 1f, 0.6f);
 
     public static bool IsShowing { get; private set; }
 
     RunRecord record;
-    Font titleFont, bodyFont;
+    Font titleFont, bodyFont, displayFont;
     GameObject root;
-    Image backdrop, flash;
+    Image backdrop, flash, rankBrush;
     readonly List<CanvasGroup> rows = new List<CanvasGroup>();
     Text timeValue, rankText, scoreText;
     CanvasGroup rankGroup, buttonGroup;
@@ -43,6 +44,7 @@ public class ResultScreen : MonoBehaviour
 
         SettingsMenu settings = FindAnyObjectByType<SettingsMenu>(FindObjectsInactive.Include);
         if (settings != null) { titleFont = settings.TitleFont; bodyFont = settings.BodyFont; }
+        displayFont = UIKit.DisplayFont(titleFont);
         UIKit.EnsureEventSystem();
         Build();
         StartCoroutine(Reveal());
@@ -62,19 +64,26 @@ public class ResultScreen : MonoBehaviour
 
         backdrop = UIKit.Image(r, null, new Color(0f, 0f, 0f, 0f));
         UIKit.Stretch(backdrop.rectTransform);
+        Image side = UIKit.Image(r, UIKit.SharedGradient, new Color(0.01f, 0.012f, 0.02f, 0.85f)); // 왼쪽을 남색 기운으로 더 어둡게
+        side.raycastTarget = false;
+        side.rectTransform.anchorMin = Vector2.zero;
+        side.rectTransform.anchorMax = new Vector2(0f, 1f);
+        side.rectTransform.pivot = new Vector2(0f, 0.5f);
+        side.rectTransform.sizeDelta = new Vector2(1150f, 0f);
         flash = UIKit.Image(r, null, new Color(Bolt.r, Bolt.g, Bolt.b, 0f));
         flash.raycastTarget = false;
         UIKit.Stretch(flash.rectTransform);
 
+        // 머리글: 장소 · VICTORY · ◆── · 토벌 완료
         const float x = 560f, w = 480f;
-        Text zone = UIKit.Text(r, record.FinalZone, bodyFont, 24, Gold, TextAnchor.MiddleLeft);
-        UIKit.Place(zone.rectTransform, x, 200f, 800f, 34f);
-        Text title = UIKit.Text(r, "토벌 완료", titleFont, 72, Color.white, TextAnchor.MiddleLeft);
-        UIKit.Place(title.rectTransform, x, 262f, 800f, 90f);
-        title.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(3f, -3f);
-        Image line = UIKit.Image(r, null, new Color(Gold.r, Gold.g, Gold.b, 0.6f));
-        line.raycastTarget = false;
-        UIKit.Place(line.rectTransform, x, 322f, 800f, 2f);
+        Text zone = UIKit.Text(r, record.FinalZone, bodyFont, 22, Gold, TextAnchor.MiddleLeft);
+        UIKit.Place(zone.rectTransform, x, 150f, 800f, 30f);
+        Text title = UIKit.Text(r, "VICTORY", displayFont, 78, Color.white, TextAnchor.MiddleLeft);
+        UIKit.Place(title.rectTransform, x - 4f, 215f, 800f, 96f);
+        title.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(0f, -4f);
+        UIKit.Ornament(r, x, 275f, 420f, Gold);
+        Text caption = UIKit.Text(r, "토벌 완료", bodyFont, 20, new Color(Gold.r, Gold.g, Gold.b, 0.85f), TextAnchor.MiddleLeft);
+        UIKit.Place(caption.rectTransform, x + 2f, 306f, 400f, 30f);
 
         float y = 380f;
         timeValue = AddRow(x, w, ref y, "클리어 시간", "00:00", record.NewBestTime ? "신기록" : "");
@@ -82,32 +91,43 @@ public class ResultScreen : MonoBehaviour
         AddRow(x, w, ref y, "처형", record.Executions.ToString(), "");
         AddRow(x, w, ref y, "패링 · 역뢰", $"{record.Parries} · {record.Counters}", "");
         AddRow(x, w, ref y, "저스트 회피", record.JustDodges.ToString(), "");
-        AddRow(x, w, ref y, "섬뢰일도", record.SkillCuts.ToString(), ""); // [변경] 용어 교체
+        AddRow(x, w, ref y, "섬뢰일도", record.SkillCuts.ToString(), "");
         AddRow(x, w, ref y, "피격", record.HitsTaken.ToString(), "");
         AddRow(x, w, ref y, "재도전", record.Deaths.ToString(), "");
         AddRow(x, w, ref y, "레벨", record.Level.ToString(), "");
 
-        // 랭크 (오른쪽)
+        // 랭크 (오른쪽): ── RANK ── + 큰 글자 + 뒤에 비스듬한 붓질
         var rankRoot = new GameObject("Rank", typeof(RectTransform));
         rankRoot.transform.SetParent(r, false);
         UIKit.Stretch((RectTransform)rankRoot.transform);
         rankGroup = rankRoot.AddComponent<CanvasGroup>();
         rankGroup.alpha = 0f;
-        Text rankLabel = UIKit.Text(rankRoot.transform, "RANK", titleFont, 26, Dim, TextAnchor.MiddleCenter);
+        rankBrush = UIKit.BrushBehind(rankRoot.transform, 1040f, 575f, 460f, 170f, new Color(RankColor(record.Rank).r, RankColor(record.Rank).g, RankColor(record.Rank).b, 0.22f));
+        rankBrush.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 8f);
+        rankBrush.rectTransform.localScale = new Vector3(0f, 1f, 1f);
+        Text rankLabel = UIKit.Text(rankRoot.transform, "RANK", displayFont, 26, Dim, TextAnchor.MiddleCenter);
         UIKit.Place(rankLabel.rectTransform, 1130f, 420f, 260f, 34f);
-        rankText = UIKit.Text(rankRoot.transform, record.Rank, titleFont, 230, RankColor(record.Rank), TextAnchor.MiddleCenter);
+        Image leftLine = UIKit.Image(rankRoot.transform, UIKit.SharedGradient, new Color(Gold.r, Gold.g, Gold.b, 0.6f));
+        UIKit.Place(leftLine.rectTransform, 1110f, 420f, 90f, 2f);
+        leftLine.rectTransform.localScale = new Vector3(-1f, 1f, 1f); // 가운데(글자) 쪽이 진하게
+        Image rightLine = UIKit.Image(rankRoot.transform, UIKit.SharedGradient, new Color(Gold.r, Gold.g, Gold.b, 0.6f));
+        UIKit.Place(rightLine.rectTransform, 1330f, 420f, 90f, 2f);
+        rankText = UIKit.Text(rankRoot.transform, record.Rank, displayFont, 230, RankColor(record.Rank), TextAnchor.MiddleCenter);
         UIKit.Place(rankText.rectTransform, 1130f, 570f, 260f, 260f);
         rankText.gameObject.AddComponent<Outline>().effectColor = new Color(0f, 0f, 0f, 0.6f);
-        scoreText = UIKit.Text(rankRoot.transform, $"{record.Score} / 100", bodyFont, 26, Dim, TextAnchor.MiddleCenter);
+        scoreText = UIKit.Text(rankRoot.transform, $"{record.Score} / 100", displayFont, 26, Dim, TextAnchor.MiddleCenter);
         UIKit.Place(scoreText.rectTransform, 1130f, 715f, 260f, 34f);
 
-        // 버튼
+        // 버튼: 금빛 구분선 위
         var buttons = new GameObject("Buttons", typeof(RectTransform));
         buttons.transform.SetParent(r, false);
         UIKit.Stretch((RectTransform)buttons.transform);
         buttonGroup = buttons.AddComponent<CanvasGroup>();
         buttonGroup.alpha = 0f;
         buttonGroup.interactable = false;
+        Image bottom = UIKit.Image(buttons.transform, UIKit.SharedGradient, new Color(Gold.r, Gold.g, Gold.b, 0.45f));
+        bottom.raycastTarget = false;
+        UIKit.Place(bottom.rectTransform, x, 860f, 900f, 1f);
         AddButton(buttons.transform, "CONTINUE", x, Continue);
         if (Application.CanStreamedLevelBeLoaded(TitleScreen.SceneName))
             AddButton(buttons.transform, "MAIN MENU", x + 300f, () => SceneTransition.Load(TitleScreen.SceneName, false));
@@ -124,13 +144,14 @@ public class ResultScreen : MonoBehaviour
         g.alpha = 0f;
         rows.Add(g);
 
+        UIKit.Diamond(go.transform, x - 22f, y, 7f, new Color(Gold.r, Gold.g, Gold.b, 0.7f));
         Text l = UIKit.Text(go.transform, label, bodyFont, 26, Dim, TextAnchor.MiddleLeft);
         UIKit.Place(l.rectTransform, x, y, w, 40f);
-        Text v = UIKit.Text(go.transform, value, titleFont, 30, Color.white, TextAnchor.MiddleRight);
+        Text v = UIKit.Text(go.transform, value, displayFont, 30, Color.white, TextAnchor.MiddleRight);
         UIKit.Place(v.rectTransform, x, y, w, 40f);
         if (!string.IsNullOrEmpty(tag))
         {
-            Text t = UIKit.Text(go.transform, tag, titleFont, 20, Gold, TextAnchor.MiddleLeft);
+            Text t = UIKit.Text(go.transform, tag, bodyFont, 20, Gold, TextAnchor.MiddleLeft); // 한글이라 세리프 대신 본문 글꼴
             UIKit.Place(t.rectTransform, x + w + 18f, y, 120f, 40f);
         }
         y += 52f;
@@ -139,7 +160,7 @@ public class ResultScreen : MonoBehaviour
 
     void AddButton(Transform parent, string label, float x, System.Action onClick)
     {
-        Text t = UIKit.Text(parent, label, titleFont, 34, Color.white, TextAnchor.MiddleLeft);
+        Text t = UIKit.Text(parent, label, displayFont, 30, Color.white, TextAnchor.MiddleLeft);
         UIKit.Place(t.rectTransform, x, 905f, 280f, 56f);
         UIKit.TextButton(t, Dim, Gold, onClick);
     }
@@ -180,6 +201,7 @@ public class ResultScreen : MonoBehaviour
             rank.localScale = Vector3.one * Mathf.Lerp(1.8f, 1f, t * t);
         });
         StartCoroutine(Tween(0.5f, t => flash.color = new Color(Bolt.r, Bolt.g, Bolt.b, 0.35f * (1f - t))));
+        StartCoroutine(Tween(0.35f, t => rankBrush.rectTransform.localScale = new Vector3(t, 1f, 1f))); // 랭크 뒤 붓질을 한 번에 그음
 
         yield return new WaitForSecondsRealtime(0.3f);
         yield return Tween(0.3f, t => buttonGroup.alpha = t);

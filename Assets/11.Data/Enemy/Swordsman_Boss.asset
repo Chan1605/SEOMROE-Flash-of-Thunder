@@ -54,8 +54,8 @@ MonoBehaviour:
   exhaustTime: 1.4
   displayName: "\uD751\uB8B0"
   maxPosture: 100
-  postureRegenDelay: 2.5
-  postureRegenRate: 10
+  postureRegenDelay: 1.5
+  postureRegenRate: 14
   postureBreakStun: 3.5
   parryPosture: 30
   executionDamageRatio: 0.25

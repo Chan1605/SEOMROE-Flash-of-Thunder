@@ -7,7 +7,7 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 // ESC 설정 패널: 왼쪽 분류(DISPLAY·GAMEPLAY·GRAPHICS·AUDIO), 오른쪽 항목, 아래 Back · Apply/Restore Defaults
-// [변경] 타이틀과 같은 모양으로: 세리프 글꼴(Cinzel) · 금빛 장식선과 마름모 · 고른 분류 뒤 붓질 · 한글 캡션 · 열릴 때 페이드
+// 타이틀과 같은 모양: 세리프 글꼴(Cinzel) · 금빛 장식선과 마름모 · 고른 분류 뒤 붓질 · 한글 캡션 · 열릴 때 페이드
 //  - 인게임: ESC로 열면 일시정지(GamePause) + 커서 표시, Back/ESC로 한 단계씩 닫고 마지막에 재개
 //  - 화면 항목은 Apply를 눌러야 적용, 나머지는 바꾸는 즉시 적용 (GameSettings · AudioOptions)
 //  - UI는 실행할 때 코드로 생성 (1920x1080 기준 좌표). 배치·연결은 Tools/Setup/Settings Menu
@@ -17,7 +17,7 @@ public class SettingsMenu : MonoBehaviour
 {
     [SerializeField] Font titleFont;   // 예전 분류·버튼 글꼴 (displayFont가 없을 때 대신 씀)
     [SerializeField] Font bodyFont;    // 항목 이름·값 · 한글 캡션
-    [SerializeField] Font displayFont; // [변경] 머리글·분류·버튼 (타이틀 로고와 같은 Cinzel)
+    [SerializeField] Font displayFont; // 머리글·분류·버튼 (타이틀 로고와 같은 Cinzel)
     [SerializeField] bool inGame = true;
     [SerializeField] Color accent = new Color(0.95f, 0.8f, 0.45f, 1f);
     [SerializeField] Color dimText = new Color(1f, 1f, 1f, 0.6f);
@@ -26,6 +26,7 @@ public class SettingsMenu : MonoBehaviour
     public bool IsOpen => root != null && root.activeSelf;
     public Font TitleFont => titleFont; // 결과 화면이 같은 글꼴을 씀
     public Font BodyFont => bodyFont;
+    public Font DisplayFont => Display; // [변경] 스킬트리 · 결과 화면이 같은 세리프를 빌려 씀
     public event Action Closed; // 타이틀 화면에서 돌아갈 때 사용
 
     enum Page { Root, Display, Gameplay, Graphics, Audio, Quit }
@@ -102,7 +103,7 @@ public class SettingsMenu : MonoBehaviour
             }
         }
         if (inGame && IsOpen) Time.timeScale = 0f; // 멈춘 사이 다른 스크립트가 timeScale을 바꿔도 다시 멈춤
-        if (IsOpen && rootGroup.alpha < 1f) rootGroup.alpha = Mathf.MoveTowards(rootGroup.alpha, 1f, Time.unscaledDeltaTime / 0.18f); // [변경] 열릴 때 페이드 인
+        if (IsOpen && rootGroup.alpha < 1f) rootGroup.alpha = Mathf.MoveTowards(rootGroup.alpha, 1f, Time.unscaledDeltaTime / 0.18f); // 열릴 때 페이드 인
     }
 
     public void Open()
@@ -153,7 +154,7 @@ public class SettingsMenu : MonoBehaviour
         headerSection.text = section ? CategoryNames[(int)next - 1] : "";
         headerCaption.text = section ? CategoryCaptions[(int)next - 1] : "";
 
-        // [변경] 고른 분류: 밑줄 대신 타이틀 메뉴처럼 붓질 + 마름모, 캡션도 밝게
+        // 고른 분류: 밑줄 대신 타이틀 메뉴처럼 붓질 + 마름모, 캡션도 밝게
         int selected = (int)next - 1;
         for (int i = 0; i < categoryButtons.Count; i++)
         {
@@ -232,7 +233,7 @@ public class SettingsMenu : MonoBehaviour
 
     void BuildQuit()
     {
-        // [변경] 타이틀 로고 묶음처럼: 세리프 큰 글씨 + 금빛 장식선 + 한글 캡션
+        // 타이틀 로고 묶음처럼: 세리프 큰 글씨 + 금빛 장식선 + 한글 캡션
         Text question = MakeText(content, "LEAVE THE GAME?", Display, 44, Color.white, TextAnchor.MiddleLeft);
         Place(question.rectTransform, 170f, 430f, 900f, 60f);
         Ornament(content, 170f, 478f, 360f);
@@ -439,7 +440,7 @@ public class SettingsMenu : MonoBehaviour
         side.rectTransform.pivot = new Vector2(0f, 0.5f);
         side.rectTransform.sizeDelta = new Vector2(1150f, 0f);
 
-        // [변경] 머리글: SETTINGS (세리프) + ◆── 장식선 + 한글 캡션
+        // 머리글: SETTINGS (세리프) + ◆── 장식선 + 한글 캡션
         settingsTitle = MakeText(rootRect, "SETTINGS", Display, 50, Color.white, TextAnchor.MiddleLeft);
         Place(settingsTitle.rectTransform, 100f, 110f, 500f, 70f);
         settingsTitle.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(0f, -3f);

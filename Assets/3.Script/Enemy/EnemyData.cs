@@ -23,9 +23,9 @@ public class EnemyData : ScriptableObject
     [SerializeField] AttackData firstAttack;
     [SerializeField] float windupTime = 0.5f;
     [SerializeField] float attackCooldown = 1.5f;
-    [SerializeField] float attackPower = 1f;           // [변경] 공격 피해 배율 (AttackData 피해 × 이 값)
-    [SerializeField] bool resistInstantKill;           // [변경] 섬뢰일도 즉사 대신 최대 체력 × instantKillDamageRatio 피해 (궁극기 · 처형은 그대로 즉사)
-    [SerializeField] bool useDelaySlash;               // [변경] 보스처럼 지연 베기 (delayChance · delayTime 사용)
+    [SerializeField] float attackPower = 1f; // 공격 피해 배율 (AttackData 피해 × 이 값)
+    [SerializeField] bool resistInstantKill; // 섬뢰일도 즉사 대신 최대 체력 × instantKillDamageRatio 피해 (궁극기 · 처형은 그대로 즉사)
+    [SerializeField] bool useDelaySlash; // 보스처럼 지연 베기 (delayChance · delayTime 사용)
     [SerializeField] bool armorDuringSwing = true;
     // true면 칼을 휘두르기 시작한 순간부터 연타가 끝날 때까지 아머 → □로는 못 끊고 △ 간파로 맞받아야 함. 예고(Windup) 중에는 경직됨
     [SerializeField] bool armorWholeSwing = true;
@@ -90,6 +90,19 @@ public class EnemyData : ScriptableObject
     [SerializeField, Range(0f, 1f)] float delayChance = 0.5f;     // 마지막 타 직전 칼을 든 채 멈칫할 확률 (지연 베기)
     [SerializeField] Vector2 delayTime = new Vector2(0.35f, 0.65f);
 
+    // [변경] 보스 개편: 기술 대응 · 위험 공격 · 2페이즈 압박 · 체간 회복 가속 (EnemySwordsman.BossAI.cs)
+    [Header("Boss · AI")]
+    [SerializeField] float skillDeflectCooldown = 12f;   // 섬뢰일도를 튕겨내고 반격하는 간격 (2페이즈는 쿨타임 배율 적용)
+    [SerializeField] int parriesBeforePerilous = 2;      // 이 시간 안에 연달아 이만큼 패링당하면 다음 연타 첫 타가 위험 공격
+    [SerializeField] float parryMemory = 6f;
+    [SerializeField] float perilousChance = 0.15f;       // 1페이즈에서 연타마다 위험 공격이 나올 확률
+    [SerializeField] float phase2PerilousChance = 0.35f;
+    [SerializeField] float perilousExtraWindup = 0.35f;  // 위험 공격은 예고가 이만큼 더 길어 읽을 수 있음
+    [SerializeField] float perilousDamageScale = 1.5f;
+    [SerializeField] float phase2ComboRestartChance = 0.4f; // 2페이즈: 연타가 끝나도 곧바로 다시 몰아칠 확률
+    [SerializeField] float phase2ComboStopScale = 0.4f;     // 2페이즈: 연타를 중간에 끊는 확률 배율
+    [SerializeField] float postureRegenRamp = 0.6f;         // 회복이 시작된 뒤 1초마다 회복 속도 +60%
+
     [Header("Boss · Grab (회피만 가능)")]
     [SerializeField] AttackData grabAttack;
     [SerializeField, Range(0f, 1f)] float grabChance = 0.3f; // 가까이서 공격할 때 잡기를 고를 확률
@@ -135,7 +148,7 @@ public class EnemyData : ScriptableObject
     public AttackData FirstAttack => firstAttack;
     public float WindupTime => windupTime;
     public float AttackCooldown => attackCooldown;
-    public float AttackPower => attackPower;     // [변경]
+    public float AttackPower => attackPower;
     public bool ResistInstantKill => resistInstantKill;
     public bool UseDelaySlash => useDelaySlash;
     public bool ArmorDuringSwing => armorDuringSwing;
@@ -190,6 +203,17 @@ public class EnemyData : ScriptableObject
     public float ComboStopChance => comboStopChance;
     public float DelayChance => delayChance;
     public Vector2 DelayTime => delayTime;
+
+    public float SkillDeflectCooldown => skillDeflectCooldown;
+    public int ParriesBeforePerilous => parriesBeforePerilous;
+    public float ParryMemory => parryMemory;
+    public float PerilousChance => perilousChance;
+    public float Phase2PerilousChance => phase2PerilousChance;
+    public float PerilousExtraWindup => perilousExtraWindup;
+    public float PerilousDamageScale => perilousDamageScale;
+    public float Phase2ComboRestartChance => phase2ComboRestartChance;
+    public float Phase2ComboStopScale => phase2ComboStopScale;
+    public float PostureRegenRamp => postureRegenRamp;
 
     public AttackData GrabAttack => grabAttack;
     public float GrabChance => grabChance;

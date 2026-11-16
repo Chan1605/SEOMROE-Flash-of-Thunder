@@ -12,6 +12,8 @@ public static class LoadingSceneSetup
     const string ScenePath = "Assets/1.Scene/Loading.unity";
     const string TitleFontPath = "Assets/9.Font/public/static/Pretendard-SemiBold.otf";
     const string BodyFontPath = "Assets/9.Font/public/static/Pretendard-Regular.otf";
+    const string DisplayFontPath = "Assets/9.Font/Display/Cinzel-Bold.ttf"; // [변경] 타이틀과 같은 글꼴
+    const string PlaceFontPath = "Assets/9.Font/Display/SongMyung-Regular.ttf";
 
     [MenuItem("Tools/Setup/Loading Scene")]
     static void Run()
@@ -40,6 +42,8 @@ public static class LoadingSceneSetup
         var so = new SerializedObject(screen);
         so.FindProperty("titleFont").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Font>(TitleFontPath);
         so.FindProperty("bodyFont").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Font>(BodyFontPath);
+        so.FindProperty("displayFont").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Font>(DisplayFontPath);
+        so.FindProperty("placeFont").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Font>(PlaceFontPath);
         so.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(scene);

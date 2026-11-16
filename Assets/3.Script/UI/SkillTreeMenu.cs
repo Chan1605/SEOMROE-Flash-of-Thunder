@@ -10,6 +10,7 @@ using UnityEngine.Video;
 //  - 씬에 이 컴포넌트가 있으면 스킬트리가 켜짐(SkillTree.Active) → 해금 전 기능은 잠김
 //  - 레벨업마다 스킬 포인트. 화톳불 근처에서는 화면 아래 "E 휴식" 안내
 // UI는 실행할 때 코드로 생성 (SettingsMenu와 같은 레이아웃 규칙). 배치·연결은 Tools/Setup/Skill Tree + Shrines
+// [변경] 타이틀 · 설정과 같은 모양: SHRINE(세리프) + ◆── + 캡션, 고른 탭 뒤 붓질, 갈래 제목 장식선, 금빛 구분선 (한글은 본문 글꼴 유지)
 [DefaultExecutionOrder(9000)]
 public class SkillTreeMenu : MonoBehaviour
 {
@@ -39,7 +40,8 @@ public class SkillTreeMenu : MonoBehaviour
     readonly List<NodeView> views = new List<NodeView>();
     readonly List<GameObject> tabRoots = new List<GameObject>();
     readonly List<Text> tabTexts = new List<Text>();
-    readonly List<Image> tabLines = new List<Image>();
+    readonly List<Image> tabLines = new List<Image>(); // 고른 탭 뒤 붓질
+    Font displayFont;
     int tab;
     PlayerHealth health;
     PlayerThunder thunder;
@@ -68,10 +70,11 @@ public class SkillTreeMenu : MonoBehaviour
         if (!restored) SkillTree.Activate(data != null ? data.startPoints : 1);
         if (unlockAllAtStart) SkillTree.UnlockAll();
 
-        boxSprite = UIKit.RoundRect(64, 64, 10f, 0f);
-        outlineSprite = UIKit.RoundRect(64, 64, 10f, 2f);
-        gradientSprite = UIKit.Gradient(256);
+        boxSprite = UIKit.RoundRect(64, 64, 4f, 0f); // [변경] 모서리를 덜 둥글게 (타이틀의 각진 장식과 맞춤)
+        outlineSprite = UIKit.RoundRect(64, 64, 4f, 2f);
+        gradientSprite = UIKit.SharedGradient;
         UIKit.EnsureEventSystem();
+        displayFont = UIKit.DisplayFont(titleFont);
         BuildPrompt();
         BuildMenu();
         menuCanvas.gameObject.SetActive(false);
@@ -168,7 +171,7 @@ public class SkillTreeMenu : MonoBehaviour
     void Refresh()
     {
         if (pointsText == null) return;
-        pointsText.text = $"SKILL POINTS  <color=#{ColorUtility.ToHtmlStringRGB(accent)}>{SkillTree.Points}</color>";
+        pointsText.text = $"SKILL POINTS   <color=#{ColorUtility.ToHtmlStringRGB(accent)}>{SkillTree.Points}</color>";
         foreach (NodeView v in views)
         {
             bool owned = SkillTree.IsUnlocked(v.Node.id);
@@ -355,7 +358,7 @@ public class SkillTreeMenu : MonoBehaviour
     {
         promptCanvas = UIKit.CreateCanvas(transform, "ShrinePrompt", 150);
         var rect = (RectTransform)promptCanvas.transform;
-        Image key = UIKit.Image(rect, outlineSprite, Color.white);
+        Image key = UIKit.Image(rect, outlineSprite, accent);
         UIKit.Place(key.rectTransform, 880f, 880f, 44f, 44f);
         Text e = UIKit.Text(key.transform, "E", titleFont, 26, Color.white, TextAnchor.MiddleCenter);
         UIKit.Stretch(e.rectTransform);
@@ -371,44 +374,51 @@ public class SkillTreeMenu : MonoBehaviour
 
         Image dim = UIKit.Image(root, null, new Color(0f, 0f, 0f, 0.8f));
         UIKit.Stretch(dim.rectTransform);
-        Image side = UIKit.Image(root, gradientSprite, new Color(0f, 0f, 0f, 0.55f));
+        Image side = UIKit.Image(root, gradientSprite, new Color(0.01f, 0.012f, 0.02f, 0.75f)); // 왼쪽을 남색 기운으로 더 어둡게
         side.rectTransform.anchorMin = Vector2.zero;
         side.rectTransform.anchorMax = new Vector2(0f, 1f);
         side.rectTransform.pivot = new Vector2(0f, 0.5f);
         side.rectTransform.sizeDelta = new Vector2(1100f, 0f);
 
-        // 머리글
-        Text shrine = UIKit.Text(root, "SHRINE", titleFont, 30, dimText, TextAnchor.MiddleLeft);
-        UIKit.Place(shrine.rectTransform, 100f, 97f, 200f, 50f);
-        // 탭: 기술 | 수련 (고른 탭은 하얗게 + 밑줄)
+        // [변경] 머리글: SHRINE (세리프) + ◆── + "화톳불 · 스킬"
+        Text shrine = UIKit.Text(root, "SHRINE", displayFont, 50, Color.white, TextAnchor.MiddleLeft);
+        UIKit.Place(shrine.rectTransform, 100f, 100f, 300f, 70f);
+        shrine.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(0f, -3f);
+        UIKit.Ornament(root, 100f, 148f, 260f, accent);
+        Text caption = UIKit.Text(root, "화톳불 · 스킬", bodyFont, 18, new Color(accent.r, accent.g, accent.b, 0.85f), TextAnchor.MiddleLeft);
+        UIKit.Place(caption.rectTransform, 102f, 178f, 300f, 28f);
+
+        // 탭: 기술 | 수련 | 궁극기 (고른 탭은 하얗게 + 뒤에 붓질)
         for (int i = 0; i < SkillTreeData.TabNames.Length; i++)
         {
             int index = i;
+            float tx = 430f + i * 130f;
+            Image brush = UIKit.BrushBehind(root, tx - 22f, 100f, 150f, 52f, new Color(accent.r, accent.g, accent.b, 0.26f));
+            tabLines.Add(brush);
             Text t = UIKit.Text(root, SkillTreeData.TabNames[i], titleFont, 30, Color.white, TextAnchor.MiddleLeft);
-            UIKit.Place(t.rectTransform, 260f + i * 120f, 97f, 100f, 50f);
+            UIKit.Place(t.rectTransform, tx, 100f, 110f, 50f);
             t.raycastTarget = true;
             Button b = t.gameObject.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
             b.onClick.AddListener(() => ShowTab(index));
             tabTexts.Add(t);
-            Image line = UIKit.Image(root, null, accent);
-            UIKit.Place(line.rectTransform, 260f + i * 120f, 128f, 60f, 2f);
-            tabLines.Add(line);
         }
-        Image headerLine = UIKit.Image(root, null, new Color(1f, 1f, 1f, 0.35f));
-        UIKit.Place(headerLine.rectTransform, 640f, 100f, 910f, 1f); // 탭이 셋이 되어 선을 오른쪽으로
-        pointsText = UIKit.Text(root, "", titleFont, 30, Color.white, TextAnchor.MiddleRight);
+        Image headerLine = UIKit.Image(root, gradientSprite, new Color(accent.r, accent.g, accent.b, 0.45f));
+        UIKit.Place(headerLine.rectTransform, 830f, 102f, 700f, 1f);
+        pointsText = UIKit.Text(root, "", displayFont, 26, Color.white, TextAnchor.MiddleRight);
         pointsText.supportRichText = true;
-        UIKit.Place(pointsText.rectTransform, 1540f, 97f, 300f, 50f);
+        UIKit.Place(pointsText.rectTransform, 1440f, 100f, 400f, 50f);
 
         BuildTree(root);
         BuildPreview(root);
 
         // 아래
-        Image bottom = UIKit.Image(root, null, new Color(1f, 1f, 1f, 0.35f));
+        Image bottom = UIKit.Image(root, gradientSprite, new Color(accent.r, accent.g, accent.b, 0.4f)); // [변경] 금빛 구분선 + ESC BACK (설정과 같게)
         UIKit.Place(bottom.rectTransform, 70f, 962f, 1780f, 1f);
-        Text back = UIKit.Text(root, "Back", titleFont, 32, Color.white, TextAnchor.MiddleLeft);
-        UIKit.Place(back.rectTransform, 100f, 1002f, 200f, 56f);
+        Text escKey = UIKit.Text(root, "ESC", bodyFont, 16, new Color(1f, 1f, 1f, 0.45f), TextAnchor.MiddleLeft);
+        UIKit.Place(escKey.rectTransform, 100f, 1004f, 60f, 30f);
+        Text back = UIKit.Text(root, "BACK", displayFont, 26, Color.white, TextAnchor.MiddleLeft);
+        UIKit.Place(back.rectTransform, 150f, 1002f, 200f, 56f);
         UIKit.TextButton(back, dimText, accent, Close);
         unlockText = UIKit.Text(root, "해금하기", titleFont, 32, Color.white, TextAnchor.MiddleRight);
         UIKit.Place(unlockText.rectTransform, 1420f, 1002f, 400f, 56f);
@@ -439,8 +449,7 @@ public class SkillTreeMenu : MonoBehaviour
             {
                 Text branch = UIKit.Text(group.transform, branches[b], titleFont, 30, accent, TextAnchor.MiddleLeft);
                 UIKit.Place(branch.rectTransform, colX0 + b * colStep, 220f, boxW, 50f);
-                Image under = UIKit.Image(group.transform, null, new Color(accent.r, accent.g, accent.b, 0.5f));
-                UIKit.Place(under.rectTransform, colX0 + b * colStep, 248f, 60f, 2f);
+                UIKit.Ornament(group.transform, colX0 + b * colStep, 250f, 200f, new Color(accent.r, accent.g, accent.b, 0.8f)); // [변경] 밑줄 → ◆── 장식선
             }
         }
 
@@ -457,7 +466,7 @@ public class SkillTreeMenu : MonoBehaviour
             // 선행이 같은 갈래의 바로 위 노드면 연결선
             if (r > 0 && lastInBranch.TryGetValue((t, b), out SkillId above) && System.Array.IndexOf(node.requires, above) >= 0)
             {
-                Image link = UIKit.Image(parent, null, new Color(1f, 1f, 1f, 0.3f));
+                Image link = UIKit.Image(parent, null, new Color(accent.r, accent.g, accent.b, 0.35f));
                 UIKit.Place(link.rectTransform, x + 30f, y - rowStep * 0.5f, 2f, rowStep - boxH);
             }
             lastInBranch[(t, b)] = node.id;
@@ -494,7 +503,7 @@ public class SkillTreeMenu : MonoBehaviour
     {
         const float x = 1060f, w = 780f, h = w * 9f / 16f;
 
-        videoFrame = UIKit.Image(root, outlineSprite, new Color(1f, 1f, 1f, 0.35f));
+        videoFrame = UIKit.Image(root, outlineSprite, new Color(accent.r, accent.g, accent.b, 0.45f)); // [변경] 금빛 테두리 + 이름 아래 장식선
         UIKit.Place(videoFrame.rectTransform, x - 4f, 210f + h * 0.5f, w + 8f, h + 8f);
 
         // 수련 노드용 수치 비교 (영상 자리)
@@ -533,8 +542,9 @@ public class SkillTreeMenu : MonoBehaviour
         previewDesc = UIKit.Text(root, "", bodyFont, 24, new Color(1f, 1f, 1f, 0.8f), TextAnchor.UpperLeft);
         previewDesc.horizontalOverflow = HorizontalWrapMode.Wrap;
         previewDesc.lineSpacing = 1.15f;
-        UIKit.Place(previewDesc.rectTransform, x, textY + 125f, w, 190f); // [변경] 설명이 4줄이어도 들어가게
-        previewInfo = UIKit.Text(root, "", bodyFont, 22, accent, TextAnchor.MiddleRight); // [변경] 해금 상태는 이름 줄 오른쪽으로 (긴 설명과 겹치던 문제)
+        UIKit.Place(previewDesc.rectTransform, x, textY + 137f, w, 190f);
+        UIKit.Ornament(root, x, textY + 32f, 320f, accent);
+        previewInfo = UIKit.Text(root, "", bodyFont, 22, accent, TextAnchor.MiddleRight);
         UIKit.Place(previewInfo.rectTransform, x, textY, w, 50f);
     }
 }

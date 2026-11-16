@@ -113,14 +113,14 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
 
     // 시련 모드: 웨이브가 오를수록 체력·공격력·경험치 배율. 생성 직후(Start 전) 호출
     float healthScale = 1f, damageScale = 1f, xpScale = 1f;
-    // [변경] 구역 강도: 지금 배율에 곱함 (생성 직후. 던전 중간보스 · 시련은 뒤에서 ApplyScaling으로 덮어씀)
+    // 구역 강도: 지금 배율에 곱함 (생성 직후. 던전 중간보스 · 시련은 뒤에서 ApplyScaling으로 덮어씀)
     public void MultiplyScaling(float strength)
     {
         healthScale *= Mathf.Max(0.1f, strength);
         damageScale *= Mathf.Max(0.1f, strength);
     }
 
-    float DamageMul => damageScale * (data != null ? data.AttackPower : 1f); // [변경] 종류별 공격력 × 구역 · 시련 배율
+    float DamageMul => damageScale * (data != null ? data.AttackPower : 1f); // 종류별 공격력 × 구역 · 시련 배율
 
     public void ApplyScaling(float health, float damage, float xp)
     {
@@ -269,7 +269,8 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
             {
                 if (IsGuardian) LowerGuardForAttack(); // 예고 동안은 가드를 내림 (이때 □로 끊을 수 있음)
                 if (TryStartGrab()) return; // 보스: 일정 확률로 잡기
-                PlanFeint(); // [변경] 정예: 첫 타 지연 베기 여부를 예고 시작 때 정함 (회피 · 역뢰 판정이 같은 값을 읽음)
+                PlanFeint(); // 정예: 첫 타 지연 베기 여부를 예고 시작 때 정함 (회피 · 역뢰 판정이 같은 값을 읽음)
+                PlanPerilous(); // [변경] 보스: 이번 연타 첫 타를 위험 공격으로 할지
                 SetState(State.Windup); // 적 시계 기준
             }
             return;
@@ -282,7 +283,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
     {
         moveSpeed = 0f;
         FaceTarget(dt, 1f);
-        if (stateTime >= data.WindupTime) StartAttack(data.FirstAttack);
+        if (stateTime >= WindupTime) StartAttack(data.FirstAttack); // [변경] 위험 공격은 예고가 더 김
     }
 
     void StartAttack(AttackData attack)
@@ -330,7 +331,9 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         if (swingActive) EndSwing();
         bool wasCharge = currentAttack != null && currentAttack == data.ChargeAttack;
         currentAttack = null;
-        attackReadyTime = localTime + data.AttackCooldown;
+        ClearPerilous();
+        if (TryRestartCombo()) return; // [변경] 보스 2페이즈: 곧바로 다시 몰아침
+        attackReadyTime = localTime + data.AttackCooldown * (IsBoss ? CooldownScale : 1f); // [변경] 2페이즈는 연타 사이 쉬는 시간도 짧게
         if (wasCharge)
         {
             Exhaust();
@@ -356,7 +359,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         if (respawnEnabled && stateTime >= data.RespawnTime) Respawn();
     }
 
-    // [변경] 즉사 저항: 섬뢰일도 즉사를 최대 체력 비율 피해로 바꿈 (궁극기 ForceKill · 처형은 그대로)
+    // 즉사 저항: 섬뢰일도 즉사를 최대 체력 비율 피해로 바꿈 (궁극기 ForceKill · 처형은 그대로)
     DamageInfo ResistKill(DamageInfo info)
     {
         if (!info.InstantKill || info.ForceKill || info.Weight == AttackWeight.Execution || data == null || !data.ResistInstantKill) return info;
@@ -377,7 +380,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         if (state == State.Dead) return HitResult.Ignored;
         if (TryBlock(info)) return HitResult.Blocked; // 방패병 정면 가드 (붕괴 조건이면 가드를 깨고 피해는 그대로)
         if (IsBoss) return BossReceiveDamage(info); // 보스는 경직 없이 체간만 쌓임
-        info = ResistKill(info); // [변경] 정예 · 방패병 · 돌격병은 섬뢰일도에 즉사하지 않음
+        info = ResistKill(info); // 정예 · 방패병 · 돌격병은 섬뢰일도에 즉사하지 않음
 
         DamageEvents.Raise(transform.position + Vector3.up * 2f, info); // 데미지 숫자
         health -= info.Damage;
@@ -423,6 +426,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
     {
         if (swingActive) EndSwing();
         currentAttack = null;
+        ClearPerilous();
 
         float duration = overrideDuration > 0f ? overrideDuration : heavy ? data.HeavyStunTime : data.LightStunTime;
         float remaining = state == State.Stun ? stunDuration - stateTime : 0f;
@@ -492,14 +496,15 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         }
         if (weapon == null) return;
 
+        bool perilous = IsPerilousAttack(currentAttack); // [변경] 위험 공격: 패링 불가 · 더 아프고 넘어뜨림
         weapon.BeginSwing(new DamageInfo
         {
             Attacker = gameObject,
-            Damage = currentAttack.Damage * DamageMul, // [변경]
+            Damage = currentAttack.Damage * DamageMul * (perilous ? data.PerilousDamageScale : 1f),
             PostureDamage = currentAttack.PostureDamage,
-            Parryable = currentAttack.Parryable,
+            Parryable = currentAttack.Parryable && !perilous,
             Weight = currentAttack.Weight, // 플레이어 피격·사망 모션 구분용
-            KnockDown = currentAttack.KnockDown
+            KnockDown = currentAttack.KnockDown || perilous
         });
     }
 
@@ -581,7 +586,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
 
         if (state == State.Windup && showWindupTell)
         {
-            float k = Mathf.Clamp01(stateTime / Mathf.Max(data.WindupTime, 0.01f));
+            float k = Mathf.Clamp01(stateTime / Mathf.Max(WindupTime, 0.01f));
             ApplyColor(Color.Lerp(BaseTint, windupColor, k * k));
             return;
         }
@@ -628,7 +633,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         get
         {
             AttackData attack = UpcomingAttack(); // 1타 판정이 끝났으면 다음 타 기준
-            return attack != null && attack.Parryable;
+            return attack != null && attack.Parryable && !IsPerilousAttack(attack); // [변경] 위험 공격은 패링 · 역뢰 불가
         }
     }
 
@@ -678,7 +683,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         if (untilBoss >= 0f) return untilBoss;
 
         if (state == State.Windup && data.FirstAttack != null)
-            return (data.WindupTime - stateTime) + data.FirstAttack.HitStart * data.FirstAttack.Duration + FirstHitDelay(); // [변경]
+            return (WindupTime - stateTime) + data.FirstAttack.HitStart * data.FirstAttack.Duration + FirstHitDelay();
 
         if (state == State.Attack && currentAttack != null)
         {

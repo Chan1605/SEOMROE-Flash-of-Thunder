@@ -96,6 +96,7 @@ public partial class EnemySwordsman
         grabReadyTime = leapReadyTime = waveReadyTime = 0f;
         ReleaseGrabbedPlayer();
         DestroyTelegraph();
+        InitBossAI(); // [변경] 개편 상태(간파 쿨타임 · 패링 적응 · 위험 공격) 초기화
     }
 
     void OnDisable()
@@ -116,8 +117,9 @@ public partial class EnemySwordsman
             postureBroken = false;
             posture = 0f;
         }
-        if (!postureBroken && posture > 0f && localTime - lastPostureHit >= data.PostureRegenDelay)
-            posture = Mathf.Max(0f, posture - data.PostureRegenRate * dt);
+        float sinceHit = localTime - lastPostureHit;
+        if (!postureBroken && posture > 0f && sinceHit >= data.PostureRegenDelay)
+            posture = Mathf.Max(0f, posture - data.PostureRegenRate * PostureRegenScale(sinceHit) * dt); // [변경] 오래 쉬게 둘수록 빨리 회복
     }
 
     // 추적 중 보스 전용 판단. true면 이번 프레임은 보스가 행동을 정함
@@ -193,7 +195,7 @@ public partial class EnemySwordsman
     {
         holdLeft = 0f;
         comboStop = false;
-        if (!UsesDelay || IsWaveAttack(attack) || attack == data.GrabAttack) // [변경] 정예도 지연 베기
+        if (!UsesDelay || IsWaveAttack(attack) || attack == data.GrabAttack) // 정예도 지연 베기
         {
             pendingDelay = 0f;
             return;
@@ -206,7 +208,8 @@ public partial class EnemySwordsman
 
         AttackData next = attack.GetNext(AttackInput.Light);
         if (next == null) return;
-        comboStop = ComboIndex(attack) >= 1 && Random.value < data.ComboStopChance;
+        if (attack != data.FirstAttack) ClearPerilous(); // [변경] 위험 공격은 첫 타만
+        comboStop = ComboIndex(attack) >= 1 && Random.value < ComboStopChance; // [변경] 2페이즈는 덜 끊음
         if (!comboStop && next.GetNext(AttackInput.Light) == null && Random.value < data.DelayChance)
         {
             pendingDelay = Random.Range(data.DelayTime.x, data.DelayTime.y);
@@ -233,13 +236,13 @@ public partial class EnemySwordsman
         return true;
     }
 
-    // [변경] 지연 베기를 쓰는 적: 보스 + useDelaySlash(정예)
+    // 지연 베기를 쓰는 적: 보스 + useDelaySlash(정예)
     bool UsesDelay => IsBoss || (data != null && data.UseDelaySlash);
     float BossHoldLeft() => UsesDelay ? Mathf.Max(0f, holdLeft) : 0f;
     float BossPendingDelay() => UsesDelay ? pendingDelay : 0f;
     bool BossStopsCombo() => UsesDelay && comboStop;
 
-    // [변경] 보스가 아닌 지연 베기 적: 첫 타에도 멈칫을 걸 수 있게 예고 시작 때 미리 정함
+    // 보스가 아닌 지연 베기 적: 첫 타에도 멈칫을 걸 수 있게 예고 시작 때 미리 정함
     void PlanFeint()
     {
         if (IsBoss || !UsesDelay || data.FirstAttack == null) return;
@@ -382,7 +385,7 @@ public partial class EnemySwordsman
         grabbedPlayer.GrabHit(new DamageInfo
         {
             Attacker = gameObject,
-            Damage = data.GrabDamage * DamageMul, // [변경] 공격력 배율
+            Damage = data.GrabDamage * DamageMul, // 공격력 배율
             Weight = AttackWeight.Heavy,
             KnockDown = true,
             HitPoint = target.position + Vector3.up * 1.2f,
@@ -579,6 +582,7 @@ public partial class EnemySwordsman
     // ===== 피해 · 체간 =====
     HitResult BossReceiveDamage(DamageInfo info)
     {
+        if (TryDeflectSkill(info)) return HitResult.Blocked; // [변경] 섬뢰일도를 쿨타임마다 튕겨내고 반격
         float max = data.MaxHealth * healthScale;
         float damage = info.Damage;
         if (info.Weight == AttackWeight.Execution) damage = max * data.ExecutionDamageRatio;
@@ -612,6 +616,7 @@ public partial class EnemySwordsman
         Vector3 dir = Flat(transform.position - parrier.transform.position).normalized;
         Flash(parryColor);
         AddPosture(data.ParryPosture, dir);
+        CountParried(); // [변경] 연달아 패링당하면 다음 연타에 위험 공격
         if (!postureBroken) EnterStun(true, dir, data.ParryStunTime);
         Log($"간파당함 · 체간 {posture:0}/{data.MaxPosture:0}");
         return HitResult.Countered;
@@ -711,6 +716,8 @@ public partial class EnemySwordsman
     {
         color = BaseTint;
         if (!IsBoss) return false;
+        if (PerilousColor(out color)) return true; // [변경] 위험 공격 예고 (빠르게 붉게 깜빡임)
+        color = BaseTint;
         float pulse = 0.5f + 0.5f * Mathf.Sin(localTime * 18f);
         switch (state)
         {
