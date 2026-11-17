@@ -11,7 +11,7 @@ public class Shrine : MonoBehaviour
     [SerializeField] float flickerSpeed = 7f;
     [SerializeField] bool logRest;
 
-    // 한눈에 휴식처로 보이게: 위로 오르는 불티 · 바닥의 따뜻한 빛 고리 (실행 중에 만듦) // [변경] 머리 위 이름 표시 제거
+    // 한눈에 휴식처로 보이게: 위로 오르는 불티 · 바닥의 따뜻한 빛 고리 (실행 중에 만듦) // 머리 위 이름 표시 제거
     static readonly Color Warm = new Color(1f, 0.62f, 0.28f);
 
     Transform player;
@@ -52,16 +52,23 @@ public class Shrine : MonoBehaviour
 
         Vector3 d = player.position - transform.position;
         d.y = 0f;
-        bool near = d.sqrMagnitude <= interactRange * interactRange && (health == null || !health.IsDead);
+        bool close = d.sqrMagnitude <= interactRange * interactRange && (health == null || !health.IsDead);
+        bool fighting = ZoneArena.Fighting != null; // [변경] 전투 중(시련 포함)엔 쉴 수 없음
+        bool near = close && !fighting;
         if (near != inRange)
         {
             inRange = near;
             menu.SetPrompt(this, near);
         }
 
-        if (!near || GamePause.IsPaused || menu.IsOpen) return;
+        if (!close || GamePause.IsPaused || menu.IsOpen) return;
         Keyboard kb = Keyboard.current;
         if (kb == null || !kb.eKey.wasPressedThisFrame) return;
+        if (fighting) // [변경] 눌러도 회복 · 스킬트리 없이 안내만
+        {
+            DamageEvents.RaiseLabel(transform.position + Vector3.up * 2.2f, "전투 중에는 쉴 수 없다", new Color(1f, 0.6f, 0.4f));
+            return;
+        }
 
         // 핵심: 휴식 = 체력 회복 → 스킬트리
         if (health != null) health.HealFull();

@@ -86,6 +86,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
     // 경험치용 전역 처치 이벤트. 부활하는 테스트용 적은 제외 (무한 경험치 방지)
     public static event System.Action<EnemySwordsman> AnyKilled;
     public bool IsTrainer => trainer;
+    public EnemyKind Kind => data != null ? data.Kind : EnemyKind.Swordsman; // [변경] 체력바 테두리 구분
 
     // 흐트러짐: 강경직(패링·간파·가드 붕괴 포함) · 돌격 탈진 · 공중에 뜸 · 쓰러짐 · 처형 가능 · 보스 체간 붕괴 (약경직은 제외)
     public bool IsStaggered => state != State.Dead &&
@@ -181,7 +182,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null) target = player.transform;
 
-        if (IsBoss) ApplyLevelScaling(player); // [변경] 체력을 정하기 전에 플레이어 레벨 보정
+        if (IsBoss) ApplyLevelScaling(player); // 체력을 정하기 전에 플레이어 레벨 보정
         health = data != null ? data.MaxHealth * healthScale : 1f;
         ApplyColor(bodyTint);
         InitGuard();

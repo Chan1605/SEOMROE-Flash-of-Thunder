@@ -38,6 +38,7 @@ public class DamageNumbers : MonoBehaviour
     {
         area = (RectTransform)transform;
         cam = Camera.main;
+        if (transform.parent != null) EnemyHealthBars.Create(transform.parent, transform.GetSiblingIndex()); // [변경] 일반 적 체력바 (피해 숫자 뒤에 그려지게 바로 앞 순서)
         for (int i = 0; i < poolSize; i++) pool.Add(Create(i));
     }
 
@@ -56,7 +57,7 @@ public class DamageNumbers : MonoBehaviour
     // 글자 알림은 치명타 크기로 조금 더 오래
     void OnLabeled(Vector3 position, string label, Color color)
     {
-        if (!GameSettings.ShowDamageNumbers) return; // [변경]
+        if (!GameSettings.ShowDamageNumbers) return;
         Entry e = pool[next];
         next = (next + 1) % pool.Count;
         e.Text.text = label;
@@ -72,7 +73,7 @@ public class DamageNumbers : MonoBehaviour
 
     void OnDealt(Vector3 position, DamageInfo info)
     {
-        if (!GameSettings.ShowDamageNumbers) return; // [변경] 설정에서 끄면 숫자를 띄우지 않음
+        if (!GameSettings.ShowDamageNumbers) return; // 설정에서 끄면 숫자를 띄우지 않음
         if (showEnemyOnly && (info.Attacker == null || !info.Attacker.CompareTag("Player"))) return;
         if (info.Weight == AttackWeight.Execution) return; // 처형은 숫자 없이 연출만
 
