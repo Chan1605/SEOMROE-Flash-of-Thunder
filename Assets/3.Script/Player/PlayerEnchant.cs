@@ -35,7 +35,7 @@ public class PlayerEnchant : MonoBehaviour
     [SerializeField] float wavePosture = 6f;
     [SerializeField] float waveRange = 7f;
     [SerializeField] float waveWidth = 3f;
-    [SerializeField] float waveSpeed = 26f; // [변경] 초당 이동 거리
+    [SerializeField] float waveSpeed = 26f; // 초당 이동 거리
 
     [Header("번개 튐")]
     [SerializeField] int chainCount = 2;
@@ -57,7 +57,14 @@ public class PlayerEnchant : MonoBehaviour
     [SerializeField] float finisherRange = 16f;
     [SerializeField] float finisherWidth = 9f;
     [SerializeField] float finisherScale = 2.2f;      // 검기 두께 · 빛 배율
-    [SerializeField] float finisherSpeed = 17.5f;     // [변경] 초당 이동 거리 (예전 값 = 26 ÷ √2.2)
+    [SerializeField] float finisherSpeed = 17.5f;     // 초당 이동 거리 (예전 값 = 26 ÷ √2.2)
+
+    // 뇌신참 손맛: 발사 순간 세상이 잠깐 멈춤(히트스톱) + 카메라가 확 당겨졌다 풀림 + 검기 임팩트 묶음
+    [Header("뇌신참 · 임팩트")]
+    [SerializeField] float releaseFreeze = 0.07f;     // 발사 순간 전체 정지 시간 (실제 시간)
+    [SerializeField] float releasePunch = 0.14f;      // 카메라 당김 비율
+    [SerializeField] float releaseShake = 0.6f;
+    [SerializeField] EnchantWave.Impact finisherImpact = new EnchantWave.Impact();
 
     [Header("Discharge")]
     [SerializeField] float dischargeDamage = 20f;
@@ -65,6 +72,16 @@ public class PlayerEnchant : MonoBehaviour
     [SerializeField] float dischargeRadius = 3f;
     [SerializeField] float dischargePerHit = 1.5f; // 강림 중 맞힌 수만큼 방전 피해 증가
     [SerializeField] float dischargeMaxBonus = 40f;
+
+    // 빔 검 소리: 강림 검기마다 · 뇌신참 예고(차오름) · 발사
+    [Header("Sound")]
+    [SerializeField] AudioClip[] waveClips;
+    [SerializeField] float waveVolume = 0.5f;
+    [SerializeField] float waveMinGap = 0.07f;    // 공속이 빨라도 이 간격보다 촘촘하면 건너뜀
+    [SerializeField] AudioClip finisherChargeClip;
+    [SerializeField] float chargeVolume = 0.8f;
+    [SerializeField] AudioClip finisherReleaseClip;
+    [SerializeField] float releaseVolume = 1f;
 
     [SerializeField] bool logEnchant = true;
 
@@ -77,8 +94,12 @@ public class PlayerEnchant : MonoBehaviour
     float startTime;                
     bool finishing, finisherSwung;  
     Image flash;                     // 뇌신참 섬광
+    AudioSource waveSource, finisherSource;
+    float lastWaveSound;
+    int lastWaveClip = -1;
     PlayerStats stats;
     PlayerCombat combat;
+    PlayerLockOn lockOn; // [변경]
 
     public bool IsActive => remaining > 0f;
     public float Remaining01 => total > 0f ? remaining / total : 0f;
@@ -113,6 +134,8 @@ public class PlayerEnchant : MonoBehaviour
         if (followCamera == null) followCamera = FindAnyObjectByType<ThirdPersonCamera>();
         stats = GetComponent<PlayerStats>();
         combat = GetComponent<PlayerCombat>();
+        waveSource = NewSource("Sfx_EnchantWave");   // 검기 소리는 피치를 매번 바꾸므로 따로
+        finisherSource = NewSource("Sfx_Finisher");
     }
 
     void OnEnable()
@@ -131,6 +154,7 @@ public class PlayerEnchant : MonoBehaviour
         {
             StopAllCoroutines();
             EndFinisher();
+            if (Mathf.Approximately(Time.timeScale, 0.03f)) Time.timeScale = 1f; // 발사 정지 도중 꺼졌을 때
         }
         if (IsActive) Finish(false);
     }
@@ -200,9 +224,23 @@ public class PlayerEnchant : MonoBehaviour
             return;
         }
         if (!IsActive) return;
-        Vector3 forward = transform.forward;
+        Vector3 forward = WaveDirection(); // [변경] 락온 중엔 몸 방향과 상관없이 대상 쪽으로
+        PlayWaveSound();
         EnchantWave.Fire(gameObject, transform.position + Vector3.up * 1.1f + forward * 0.6f, forward,
-            waveRange, waveWidth, waveDamage, wavePosture, LabelColor, 1f, false, waveSpeed); // [변경] waveSpeed
+            waveRange, waveWidth, waveDamage, wavePosture, LabelColor, 1f, false, waveSpeed); // waveSpeed
+    }
+
+    // [변경] 락온 대상이 있으면 대상 쪽(수평), 없으면 몸이 보는 쪽
+    Vector3 WaveDirection()
+    {
+        if (lockOn == null) lockOn = GetComponent<PlayerLockOn>();
+        if (lockOn != null && lockOn.Target != null)
+        {
+            Vector3 to = lockOn.Target.position - transform.position;
+            to.y = 0f;
+            if (to.sqrMagnitude > 0.01f) return to.normalized;
+        }
+        return transform.forward;
     }
 
     void OnWeaponHit(IDamageable target, DamageInfo info, HitResult result)
@@ -272,6 +310,13 @@ public class PlayerEnchant : MonoBehaviour
         CombatTime.SlowEnemies(finisherEnemySlow, finisherWindup + 0.15f, 0.2f);
         // 옆 뒤 시네마틱 카메라 삭제 (평소 카메라 그대로)
         DamageEvents.RaiseLabel(transform.position + Vector3.up * 2.4f, "뇌신참", LabelColor);
+        if (finisherChargeClip != null) // 차오르는 소리가 예고 끝(발사)에 맞춰 정점에 닿도록 재생 속도를 맞춤
+        {
+            finisherSource.pitch = Mathf.Clamp(finisherChargeClip.length / Mathf.Max(0.05f, finisherWindup), 0.7f, 1.6f);
+            finisherSource.clip = finisherChargeClip;
+            finisherSource.volume = chargeVolume * AudioOptions.SfxVolume;
+            finisherSource.Play();
+        }
 
         // 예고: 하늘에서 칼로 번개가 모임
         float bolt = 0f;
@@ -290,19 +335,60 @@ public class PlayerEnchant : MonoBehaviour
 
         // 발사
         if (stats != null) stats.SpeedMultiplier = 1f;
-        if (followCamera != null) followCamera.Shake(0.5f, 0.45f); // 발사 순간 흔들림만
+        if (followCamera != null) // 흔들림 + 당김
+        {
+            followCamera.Shake(releaseShake, 0.45f);
+            followCamera.Punch(releasePunch, 0.04f, 0.06f, 0.35f, 2f);
+        }
         StartCoroutine(Flash());
+        finisherSource.Stop(); // 차오름을 끊고 발사음
+        finisherSource.pitch = 1f;
+        if (finisherReleaseClip != null) finisherSource.PlayOneShot(finisherReleaseClip, releaseVolume * AudioOptions.SfxVolume);
         Vector3 forward = transform.forward;
         float damage = finisherDamage + Mathf.Min(finisherMaxBonus, hits * finisherDamagePerHit);
         float posture = finisherPosture + Mathf.Min(finisherMaxPostureBonus, hits * finisherPosturePerHit);
         EnchantWave.Fire(gameObject, transform.position + Vector3.up * 1.1f + forward * 0.8f, forward,
-            finisherRange, finisherWidth, damage, posture, LabelColor, finisherScale, true, finisherSpeed); // [변경] finisherSpeed
+            finisherRange, finisherWidth, damage, posture, LabelColor, finisherScale, true, finisherSpeed, finisherImpact); // 임팩트
         CombatTime.SlowEnemies(0.05f, 0.12f, 0.1f); // 발사 순간 짧은 멈춤
+        if (releaseFreeze > 0f) StartCoroutine(Freeze(releaseFreeze));
         if (logEnchant) Debug.Log($"[Enchant] 뇌신참 · 맞힌 수 {hits} → 피해 {damage:0} · 체간 {posture:0}");
         Finish(false); // 강림은 여기서 끝 (방전 없음)
 
         yield return new WaitForSecondsRealtime(0.35f); // 휘두른 뒤 자세가 풀릴 때까지
         EndFinisher();
+    }
+
+    // 빔 검 소리
+    AudioSource NewSource(string name)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(transform, false);
+        var s = go.AddComponent<AudioSource>();
+        s.playOnAwake = false;
+        s.spatialBlend = 0f;
+        return s;
+    }
+
+    void PlayWaveSound()
+    {
+        if (waveClips == null || waveClips.Length == 0 || Time.time - lastWaveSound < waveMinGap) return;
+        lastWaveSound = Time.time;
+        int i = UnityEngine.Random.Range(0, waveClips.Length);
+        if (waveClips.Length > 1 && i == lastWaveClip) i = (i + 1) % waveClips.Length;
+        lastWaveClip = i;
+        if (waveClips[i] == null) return;
+        waveSource.pitch = UnityEngine.Random.Range(0.97f, 1.03f);
+        waveSource.PlayOneShot(waveClips[i], waveVolume * AudioOptions.SfxVolume);
+    }
+
+    // 발사 순간 전체를 아주 잠깐 거의 멈춤 → 검기가 "튀어 나가는" 느낌. 다른 기능이 시간을 바꿨으면 건드리지 않음
+    IEnumerator Freeze(float seconds)
+    {
+        if (!Mathf.Approximately(Time.timeScale, 1f)) yield break;
+        const float Scale = 0.03f;
+        Time.timeScale = Scale;
+        yield return new WaitForSecondsRealtime(seconds);
+        if (Mathf.Approximately(Time.timeScale, Scale)) Time.timeScale = 1f;
     }
 
     void EndFinisher()
@@ -317,7 +403,7 @@ public class PlayerEnchant : MonoBehaviour
     // 락온 대상이 있으면 그쪽, 없으면 카메라가 보는 쪽
     void FaceTarget()
     {
-        var lockOn = GetComponent<PlayerLockOn>();
+        if (lockOn == null) lockOn = GetComponent<PlayerLockOn>(); // [변경] 검기와 같은 참조 사용
         Vector3 dir = lockOn != null && lockOn.Target != null ? lockOn.Target.position - transform.position
             : followCamera != null ? followCamera.transform.forward : transform.forward;
         dir.y = 0f;

@@ -9,6 +9,21 @@ using UnityEngine;
 //  - 커지며 날아가다 마지막에 사라짐, 적을 벨 때 그 자리에 불꽃이 터짐
 public class EnchantWave : MonoBehaviour
 {
+    // [변경] 뇌신참 임팩트 설정 (PlayerEnchant 인스펙터에서 조절, 평소 검기는 null = 없음)
+    [System.Serializable]
+    public class Impact
+    {
+        public float launchBoost = 2.5f;     // 발사 직후 속도 배율 → launchTime 동안 원래 속도로 (튀어 나가는 느낌)
+        public float launchTime = 0.18f;
+        public float launchPop = 1.35f;      // 발사 순간 크기 → 곧바로 원래 크기로
+        public float shockRadius = 7f;       // 발사 자리 바닥 충격파 고리 (0 = 없음)
+        public float skyBoltSpacing = 3.5f;  // 날아가는 길에 이 간격마다 하늘에서 낙뢰 (0 = 없음)
+        public float skyBoltThickness = 1f;
+        public float scarLife = 1.4f;        // 지나간 바닥에 남는 빛 자국 (0 = 없음)
+        public float enemyHitStop = 0.08f;   // 적을 벨 때 그 적들 잠깐 멈춤
+        public bool endBurst = true;         // 끝에서 흐려지지 않고 번개와 함께 터지며 사라짐
+    }
+
     const float BaseSpeed = 26f;
     const int Segments = 28;
     const float ArcAngle = 150f;     // 초승달이 펼쳐진 각도
@@ -27,6 +42,11 @@ public class EnchantWave : MonoBehaviour
     float range, width, damage, posture, traveled, boltTimer;
     float scale = 1f, speed = BaseSpeed; // 크기 배율 (뇌신참은 크고 느리게)
     bool heavy;
+    Impact impact;                 // [변경]
+    float age, nextSkyBolt;
+    LineRenderer scar;
+    Vector3 scarStart;
+    float groundY;
     MeshRenderer blade, echo;
     MaterialPropertyBlock block;
     ParticleSystem sparks;
@@ -36,9 +56,9 @@ public class EnchantWave : MonoBehaviour
     readonly Collider[] buffer = new Collider[16];
 
     // scale: 날 두께 · 높이 · 빛 · 불꽃을 키움 / heavy: 강경직 · 아머 무시 (뇌신참)
-    // [변경] speed: 초당 이동 거리 (0 이하면 예전처럼 BaseSpeed ÷ √scale)
+    // speed: 초당 이동 거리 (0 이하면 예전처럼 BaseSpeed ÷ √scale)
     public static void Fire(GameObject owner, Vector3 origin, Vector3 direction, float range, float width, float damage, float posture, Color color,
-        float scale = 1f, bool heavy = false, float speed = 0f)
+        float scale = 1f, bool heavy = false, float speed = 0f, Impact impact = null)
     {
         var go = new GameObject("EnchantWave");
         float roll = Random.Range(-18f, 18f); // 매번 조금씩 기울여 단조롭지 않게
@@ -51,9 +71,11 @@ public class EnchantWave : MonoBehaviour
         wave.damage = damage;
         wave.posture = posture;
         wave.scale = Mathf.Max(0.1f, scale);
-        wave.speed = speed > 0f ? speed : BaseSpeed / Mathf.Sqrt(wave.scale); // [변경]
+        wave.speed = speed > 0f ? speed : BaseSpeed / Mathf.Sqrt(wave.scale);
         wave.heavy = heavy;
+        wave.impact = impact; // [변경]
         wave.Build();
+        if (impact != null) wave.Launch();
     }
 
     void Build()
@@ -118,16 +140,21 @@ public class EnchantWave : MonoBehaviour
     // 핵심: 한 프레임에 나아간 만큼 앞쪽 상자 범위를 검사 → 빠르게 날아도 사이 적을 놓치지 않음
     void Update()
     {
-        float step = speed * Time.deltaTime;
+        age += Time.deltaTime;
+        float boost = impact != null ? 1f + (impact.launchBoost - 1f) * Mathf.Clamp01(1f - age / Mathf.Max(0.01f, impact.launchTime)) : 1f; // [변경]
+        float step = speed * boost * Time.deltaTime;
         traveled += step;
         transform.position += direction * step;
         float k = Mathf.Clamp01(traveled / range);
-        transform.localScale = Vector3.one * Mathf.Lerp(0.85f, 1.3f, k); // 날아가며 커짐
+        float pop = impact != null ? Mathf.Lerp(impact.launchPop, 1f, Mathf.Clamp01(age / 0.12f)) : 1f; // [변경]
+        transform.localScale = Vector3.one * Mathf.Lerp(0.85f, 1.3f, k) * pop; // 날아가며 커짐
+        if (impact != null) UpdateImpact(); // [변경]
 
         HitAlongPath(step);
 
         // 처음 순간 켜지고 · 후반 45%에서 사라짐
-        float alpha = Mathf.Clamp01(k / 0.08f) * (1f - Mathf.Clamp01((k - 0.55f) / 0.45f));
+        float fadeFrom = impact != null && impact.endBurst ? 0.85f : 0.55f; // [변경] 뇌신참은 끝까지 진하게 → 터지며 사라짐
+        float alpha = Mathf.Clamp01(k / 0.08f) * (1f - Mathf.Clamp01((k - fadeFrom) / (1f - fadeFrom)));
         SetAlpha(alpha);
         glow.intensity = 4f * Mathf.Sqrt(scale) * alpha;
 
@@ -141,7 +168,93 @@ public class EnchantWave : MonoBehaviour
             ThunderBolt3D.Strike(transform.TransformPoint(frontLine[a]), transform.TransformPoint(frontLine[b]), 0.18f * scale, 0);
         }
 
-        if (traveled >= range) Finish();
+        if (traveled >= range)
+        {
+            if (impact != null && impact.endBurst) EndBurst(); // [변경]
+            Finish();
+        }
+    }
+
+    // ===== [변경] 뇌신참 임팩트 =====
+    // 발사 자리: 섬광 불꽃 · 바닥 충격파 고리 · 앞쪽에 굵은 낙뢰 두 줄기
+    void Launch()
+    {
+        groundY = GroundY(transform.position);
+        var p = new ParticleSystem.EmitParams();
+        for (int i = 0; i < 40; i++)
+        {
+            p.position = transform.position;
+            p.velocity = (direction * Random.Range(4f, 12f) + Random.insideUnitSphere * 6f);
+            sparks.Emit(p, 1);
+        }
+        Vector3 ground = new Vector3(transform.position.x, groundY, transform.position.z);
+        if (impact.shockRadius > 0f) WaveFx.Ring(ground + Vector3.up * 0.05f, impact.shockRadius);
+        Vector3 side = Vector3.Cross(Vector3.up, direction).normalized;
+        for (int s = -1; s <= 1; s += 2)
+        {
+            Vector3 hit = ground + direction * 2f + side * s * width * 0.2f;
+            ThunderBolt3D.Strike(hit + Vector3.up * 14f, hit, impact.skyBoltThickness * 1.3f, 2);
+        }
+        nextSkyBolt = impact.skyBoltSpacing;
+        if (impact.scarLife > 0f) scar = Scar(ground);
+        scarStart = ground;
+    }
+
+    // 날아가는 동안: 일정 간격 하늘 낙뢰 + 바닥 빛 자국을 늘림
+    void UpdateImpact()
+    {
+        if (impact.skyBoltSpacing > 0f && traveled >= nextSkyBolt)
+        {
+            nextSkyBolt += impact.skyBoltSpacing;
+            Vector3 side = Vector3.Cross(Vector3.up, direction).normalized * Random.Range(-0.3f, 0.3f) * width;
+            Vector3 hit = new Vector3(transform.position.x, groundY, transform.position.z) + side;
+            ThunderBolt3D.Strike(hit + Vector3.up * 14f + Random.insideUnitSphere * 2f, hit, impact.skyBoltThickness, 1);
+        }
+        if (scar != null) scar.SetPosition(1, new Vector3(transform.position.x, groundY + 0.04f, transform.position.z));
+    }
+
+    // 끝: 번개가 사방으로 터지며 사라짐
+    void EndBurst()
+    {
+        Vector3 center = transform.position;
+        var p = new ParticleSystem.EmitParams();
+        for (int i = 0; i < 50; i++)
+        {
+            p.position = center + Random.insideUnitSphere * width * 0.3f;
+            p.velocity = Random.onUnitSphere * Random.Range(4f, 10f) + direction * 3f;
+            sparks.Emit(p, 1);
+        }
+        Vector3 ground = new Vector3(center.x, groundY, center.z);
+        ThunderBolt3D.Strike(ground + Vector3.up * 16f, ground, impact.skyBoltThickness * 1.5f, 3);
+        if (impact.shockRadius > 0f) WaveFx.Ring(ground + Vector3.up * 0.05f, impact.shockRadius * 0.7f);
+    }
+
+    LineRenderer Scar(Vector3 start)
+    {
+        var line = new GameObject("WaveScar").AddComponent<LineRenderer>();
+        line.sharedMaterial = bladeMat;
+        line.alignment = LineAlignment.TransformZ; // 바닥에 눕힘
+        line.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        line.positionCount = 2;
+        line.SetPosition(0, start + Vector3.up * 0.04f);
+        line.SetPosition(1, start + Vector3.up * 0.04f);
+        line.widthMultiplier = 0.35f * scale;
+        line.startColor = line.endColor = new Color(0.5f, 0.85f, 2f, 0.9f);
+        line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        WaveFx.FadeOut(line, 1f, impact.scarLife); // 날아가는 동안(약 1초) 유지 후 흐려짐
+        return line;
+    }
+
+    static float GroundY(Vector3 p)
+    {
+        float best = float.MaxValue, y = p.y - 1.1f;
+        foreach (RaycastHit h in Physics.RaycastAll(p + Vector3.up, Vector3.down, 10f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (h.collider.GetComponentInParent<CharacterController>() != null || h.distance >= best) continue;
+            best = h.distance;
+            y = h.point.y;
+        }
+        return y;
     }
 
     void HitAlongPath(float step)
@@ -167,6 +280,7 @@ public class EnchantWave : MonoBehaviour
                 Direction = direction
             });
             Burst(point);
+            if (impact != null && impact.enemyHitStop > 0f) CombatTime.SlowEnemies(0.02f, impact.enemyHitStop, 0.05f); // [변경] 벨 때 묵직하게
         }
     }
 

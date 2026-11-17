@@ -181,6 +181,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null) target = player.transform;
 
+        if (IsBoss) ApplyLevelScaling(player); // [변경] 체력을 정하기 전에 플레이어 레벨 보정
         health = data != null ? data.MaxHealth * healthScale : 1f;
         ApplyColor(bodyTint);
         InitGuard();
@@ -270,7 +271,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
                 if (IsGuardian) LowerGuardForAttack(); // 예고 동안은 가드를 내림 (이때 □로 끊을 수 있음)
                 if (TryStartGrab()) return; // 보스: 일정 확률로 잡기
                 PlanFeint(); // 정예: 첫 타 지연 베기 여부를 예고 시작 때 정함 (회피 · 역뢰 판정이 같은 값을 읽음)
-                PlanPerilous(); // [변경] 보스: 이번 연타 첫 타를 위험 공격으로 할지
+                PlanPerilous(); // 보스: 이번 연타 첫 타를 위험 공격으로 할지
                 SetState(State.Windup); // 적 시계 기준
             }
             return;
@@ -283,7 +284,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
     {
         moveSpeed = 0f;
         FaceTarget(dt, 1f);
-        if (stateTime >= WindupTime) StartAttack(data.FirstAttack); // [변경] 위험 공격은 예고가 더 김
+        if (stateTime >= WindupTime) StartAttack(data.FirstAttack); // 위험 공격은 예고가 더 김
     }
 
     void StartAttack(AttackData attack)
@@ -332,8 +333,8 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         bool wasCharge = currentAttack != null && currentAttack == data.ChargeAttack;
         currentAttack = null;
         ClearPerilous();
-        if (TryRestartCombo()) return; // [변경] 보스 2페이즈: 곧바로 다시 몰아침
-        attackReadyTime = localTime + data.AttackCooldown * (IsBoss ? CooldownScale : 1f); // [변경] 2페이즈는 연타 사이 쉬는 시간도 짧게
+        if (TryRestartCombo()) return; // 보스 2페이즈: 곧바로 다시 몰아침
+        attackReadyTime = localTime + data.AttackCooldown * (IsBoss ? CooldownScale : 1f); // 2페이즈는 연타 사이 쉬는 시간도 짧게
         if (wasCharge)
         {
             Exhaust();
@@ -496,7 +497,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         }
         if (weapon == null) return;
 
-        bool perilous = IsPerilousAttack(currentAttack); // [변경] 위험 공격: 패링 불가 · 더 아프고 넘어뜨림
+        bool perilous = IsPerilousAttack(currentAttack); // 위험 공격: 패링 불가 · 더 아프고 넘어뜨림
         weapon.BeginSwing(new DamageInfo
         {
             Attacker = gameObject,
@@ -633,7 +634,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         get
         {
             AttackData attack = UpcomingAttack(); // 1타 판정이 끝났으면 다음 타 기준
-            return attack != null && attack.Parryable && !IsPerilousAttack(attack); // [변경] 위험 공격은 패링 · 역뢰 불가
+            return attack != null && attack.Parryable && !IsPerilousAttack(attack); // 위험 공격은 패링 · 역뢰 불가
         }
     }
 

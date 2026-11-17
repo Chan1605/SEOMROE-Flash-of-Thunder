@@ -70,7 +70,22 @@ public partial class EnemySwordsman
         ActiveBoss = this;
     }
     public float Health01 => data != null ? Mathf.Clamp01(health / Mathf.Max(1f, data.MaxHealth * healthScale)) : 0f;
-    public float Posture01 => IsBoss && data.MaxPosture > 0f ? Mathf.Clamp01(posture / data.MaxPosture) : 0f;
+    public float Posture01 => IsBoss && MaxPosture > 0f ? Mathf.Clamp01(posture / MaxPosture) : 0f; // [변경] 레벨 보정 반영
+
+    // [변경] 레벨 보정: 연습장(레벨 1)에서 맞춘 전투가 본편(레벨 10~15)에서도 비슷한 길이가 되도록
+    // 플레이어 공격력이 체력 · 체간 피해를 모두 키우므로, 보스 체력과 최대 체간을 (공격력 ^ BossLevelScaling)배
+    float levelScale = 1f;
+    float MaxPosture => data.MaxPosture * levelScale;
+
+    void ApplyLevelScaling(GameObject player)
+    {
+        levelScale = 1f;
+        PlayerStats stats = player != null ? player.GetComponent<PlayerStats>() : null;
+        if (stats == null || data.BossLevelScaling <= 0f) return;
+        levelScale = Mathf.Pow(Mathf.Max(1f, stats.AttackPower), data.BossLevelScaling);
+        healthScale *= levelScale;
+        Log($"레벨 보정 · 공격력 {stats.AttackPower:P0} → 체력 · 체간 ×{levelScale:0.00}");
+    }
     public bool IsPostureBroken => postureBroken;
     public bool IsPhase2 => phase2;
     public float Phase2Ratio => IsBoss && data != null ? data.Phase2Ratio : 0f; // 2페이즈 없는 적은 0 (눈금 없음)
@@ -141,7 +156,7 @@ public partial class EnemySwordsman
             Log("등장");
             return true;
         }
-        if (posture >= data.MaxPosture && !postureBroken)
+        if (posture >= MaxPosture && !postureBroken)
         {
             BreakPosture(-transform.forward);
             return true;
@@ -596,7 +611,7 @@ public partial class EnemySwordsman
         else
         {
             if (info.InstantKill) damage = max * data.InstantKillDamageRatio;
-            damage *= postureBroken ? data.BrokenDamageScale : data.NormalDamageScale; // [변경] 평소엔 조금, 그로기(체간 붕괴) 때 몰아서
+            damage *= postureBroken ? data.BrokenDamageScale : data.NormalDamageScale; // 평소엔 조금, 그로기(체간 붕괴) 때 몰아서
         }
 
         DamageInfo shown = info;
@@ -629,16 +644,16 @@ public partial class EnemySwordsman
         AddPosture(data.ParryPosture, dir);
         CountParried(); // 연달아 패링당하면 다음 연타에 위험 공격
         if (!postureBroken) EnterStun(true, dir, data.ParryStunTime);
-        Log($"간파당함 · 체간 {posture:0}/{data.MaxPosture:0}");
+        Log($"간파당함 · 체간 {posture:0}/{MaxPosture:0}");
         return HitResult.Countered;
     }
 
     void AddPosture(float amount, Vector3 direction)
     {
         if (amount <= 0f || postureBroken) return;
-        posture = Mathf.Min(data.MaxPosture, posture + amount);
+        posture = Mathf.Min(MaxPosture, posture + amount);
         lastPostureHit = localTime;
-        if (posture >= data.MaxPosture && CanBreakNow()) BreakPosture(direction); // 지금 못 끊는 동작이면 추적으로 돌아올 때 붕괴
+        if (posture >= MaxPosture && CanBreakNow()) BreakPosture(direction); // 지금 못 끊는 동작이면 추적으로 돌아올 때 붕괴
     }
 
     bool CanBreakNow() =>
@@ -653,7 +668,7 @@ public partial class EnemySwordsman
         if (!controller.enabled) controller.enabled = true;
 
         postureBroken = true;
-        posture = data.MaxPosture;
+        posture = MaxPosture;
         moveSpeed = 0f;
         stunDuration = data.PostureBreakStun;
         attackReadyTime = Mathf.Max(attackReadyTime, localTime + stunDuration);

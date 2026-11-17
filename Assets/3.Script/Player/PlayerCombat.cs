@@ -14,7 +14,7 @@ public partial class PlayerCombat : MonoBehaviour // 공중 콤보 삭제 (띄�
     [SerializeField] AttackData lightStarter;
     [SerializeField] AttackData heavyStarter;
     [SerializeField] bool heavyStartsCombo = false; // 켜면 예전처럼 대기 중 우클릭 탭 = 강공격
-    [SerializeField] AttackData heavyFallback; // [변경] △ 분기가 없는 공격(마무리 타 등) 중 △ → 이 공격으로 이어짐 (= 공격 중 우클릭은 항상 간파)
+    [SerializeField] AttackData heavyFallback; // △ 분기가 없는 공격(마무리 타 등) 중 △ → 이 공격으로 이어짐 (= 공격 중 우클릭은 항상 간파)
     [SerializeField] AttackData runStarter;      // 달리는 중 □ → 달리기 공격 (없으면 일반 □)
     [SerializeField] float runAttackSpeed = 7f;  // 이 속도 이상으로 달리고 있으면 달리기 공격
 
@@ -157,10 +157,10 @@ public partial class PlayerCombat : MonoBehaviour // 공중 콤보 삭제 (띄�
         bool buffered = lastPressTime >= attackStartTime + current.InputOpen * current.Duration / AttackSpeed; // 실제 시간으로 환산
         if (buffered && !deflected && t >= current.ComboTransition)
         {
-            AttackData next = NextAttack(current, lastPressInput); // [변경] 분기가 없으면 heavyFallback
+            AttackData next = NextAttack(current, lastPressInput); // 분기가 없으면 heavyFallback
             if (next != null)
             {
-                if (next != current.GetNext(lastPressInput)) fallbackUsed = true; // [변경] 대체 △는 콤보당 한 번 (△ 무한 반복 방지)
+                if (next != current.GetNext(lastPressInput)) fallbackUsed = true; // 대체 △는 콤보당 한 번 (△ 무한 반복 방지)
                 StartAttack(next, false);
                 return;
             }
@@ -181,7 +181,7 @@ public partial class PlayerCombat : MonoBehaviour // 공중 콤보 삭제 (띄�
         if (swingActive) EndSwing();
 
         AttackInput input = lastPressInput;
-        if (isStarter) fallbackUsed = false; // [변경]
+        if (isStarter) fallbackUsed = false;
         current = attack;
         CurrentIsBranch = !isStarter; // AttackStarted 구독자가 읽을 수 있게 이벤트 전에 설정
         damageMultiplier = 1f;
@@ -207,6 +207,12 @@ public partial class PlayerCombat : MonoBehaviour // 공중 콤보 삭제 (띄�
                 to.y = 0f;
                 if (to.sqrMagnitude > 0.0001f) transform.rotation = Quaternion.LookRotation(to.normalized, Vector3.up);
                 stepTotal = Mathf.Clamp(distance - targeting.StopDistance, 0f, baseStep + targeting.MaxPull);
+            }
+            else if (targeting != null && targeting.LockTarget != null) // [변경] 락온 대상이 멀어도(lockAttackRange 밖) 입력 방향 대신 대상 쪽으로 벰. 내딛기는 기본만
+            {
+                Vector3 to = targeting.LockTarget.position - transform.position;
+                to.y = 0f;
+                if (to.sqrMagnitude > 0.0001f) transform.rotation = Quaternion.LookRotation(to.normalized, Vector3.up);
             }
             else if (dir.sqrMagnitude > 0.0001f)
             {
@@ -266,7 +272,7 @@ public partial class PlayerCombat : MonoBehaviour // 공중 콤보 삭제 (띄�
 
     float AttackSpeed => stats != null ? stats.AttackSpeed : 1f;
 
-    // [변경] 다음 공격: 콤보 분기 → 없으면 △만 heavyFallback (땅 위 · 콤보당 한 번). PlayerKanpa도 이 값으로 간파 여부를 판단
+    // 다음 공격: 콤보 분기 → 없으면 △만 heavyFallback (땅 위 · 콤보당 한 번). PlayerKanpa도 이 값으로 간파 여부를 판단
     bool fallbackUsed;
 
     public AttackData NextAttack(AttackData from, AttackInput input)

@@ -1717,6 +1717,7 @@ MonoBehaviour:
   wavePosture: 6
   waveRange: 15
   waveWidth: 6
+  waveSpeed: 26
   chainCount: 2
   chainRadius: 6
   chainDamage: 8
@@ -1733,11 +1734,35 @@ MonoBehaviour:
   finisherRange: 20
   finisherWidth: 20
   finisherScale: 2.2
+  finisherSpeed: 17.5
+  releaseFreeze: 0.07
+  releasePunch: 0.14
+  releaseShake: 0.6
+  finisherImpact:
+    launchBoost: 2.5
+    launchTime: 0.18
+    launchPop: 1.35
+    shockRadius: 0
+    skyBoltSpacing: 3.5
+    skyBoltThickness: 1
+    scarLife: 0
+    enemyHitStop: 0.08
+    endBurst: 1
   dischargeDamage: 20
   dischargePostureDamage: 20
   dischargeRadius: 3
   dischargePerHit: 1.5
   dischargeMaxBonus: 40
+  waveClips:
+  - {fileID: 8300000, guid: 2ca181a6beda412ba877f9352a7802eb, type: 3}
+  - {fileID: 8300000, guid: 55a17967170e4e1eb08bba277c1533c6, type: 3}
+  - {fileID: 8300000, guid: 378fd9c765574e5f8942e21071177833, type: 3}
+  waveVolume: 0.5
+  waveMinGap: 0.07
+  finisherChargeClip: {fileID: 8300000, guid: bea4c3a321e147dd8bfcb8419ae01da3, type: 3}
+  chargeVolume: 0.8
+  finisherReleaseClip: {fileID: 8300000, guid: c4f0a3908fee490c926d6d27cc3bd2f3, type: 3}
+  releaseVolume: 1
   logEnchant: 0
 --- !u!114 &3411027780979314902
 MonoBehaviour:

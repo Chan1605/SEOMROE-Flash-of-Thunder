@@ -18,7 +18,7 @@ public class PlayerTargeting : MonoBehaviour
     [SerializeField] bool logTarget;
 
     readonly Collider[] overlapBuffer = new Collider[32];
-    [SerializeField] PlayerLockOn lockOn;        // [변경] 락온 중이면 그 대상을 우선
+    [SerializeField] PlayerLockOn lockOn;        // 락온 중이면 그 대상을 우선
     [SerializeField] float lockAttackRange = 6f; // 이 거리 안이면 입력 방향과 상관없이 락온 대상에게
 
     Transform lastTarget;
@@ -29,6 +29,7 @@ public class PlayerTargeting : MonoBehaviour
     public float StopDistance => stopDistance;
     public float MaxPull => maxPull;
     public Transform LastTarget => lastTarget;
+    public Transform LockTarget => lockOn != null && lockOn.IsLocked ? lockOn.Target : null; // [변경] 거리와 상관없는 락온 대상
 
     void Awake()
     {
@@ -41,7 +42,7 @@ public class PlayerTargeting : MonoBehaviour
         distance = 0f;
         if (!softTargeting) return false;
 
-        if (lockOn != null && lockOn.IsLocked) // [변경]
+        if (lockOn != null && lockOn.IsLocked)
         {
             float d = Flat(lockOn.Target.position - transform.position).magnitude;
             if (d <= lockAttackRange)
@@ -49,6 +50,7 @@ public class PlayerTargeting : MonoBehaviour
                 Remember(lockOn.Target, d, out target, out distance);
                 return true;
             }
+            return false; // [변경] 락온 중엔 다른 적을 고르지 않음 (멀면 PlayerCombat이 몸만 대상 쪽으로 돌림)
         }
 
         bool hasInput = inputDirection.sqrMagnitude > 0.0001f;
