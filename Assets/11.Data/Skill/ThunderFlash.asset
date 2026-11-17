@@ -50,7 +50,7 @@ MonoBehaviour:
   enchantStanceSeconds: 3.5
   enchantMaxMarks: 0
   dodgeStanceWindow: 0.9
-  dodgeStanceCost: 0
+  dodgeStanceCost: 1
   dodgeAutoMarks: 3
   dodgeAutoRange: 12
   dodgeDrawDelay: 0.12

@@ -46,7 +46,7 @@ public class TutorialDirector : MonoBehaviour
     [SerializeField] float centerRadius = 4f;     // 이 안으로 들어오면 가운데 도착
     [SerializeField] GameObject exitBarrier;
     [SerializeField] List<GameObject> lineups = new List<GameObject>();
-    [SerializeField] string[] chapters = { "기본기", "방어", "섬뢰일도", "각성", "성장" }; // [변경] 용어 교체
+    [SerializeField] string[] chapters = { "기본기", "방어", "섬뢰일도", "각성", "성장" }; // 용어 교체
     [SerializeField] List<Lesson> lessons = DefaultLessons();
     [SerializeField] Font titleFont;
     [SerializeField] Font bodyFont;
@@ -59,7 +59,9 @@ public class TutorialDirector : MonoBehaviour
 
     public static TutorialDirector Instance { get; private set; }
     public static bool CompletedBefore => PlayerPrefs.GetInt(DoneKey, 0) == 1;
+    public static void ResetRecord() => PlayerPrefs.DeleteKey(DoneKey); // 테스트용: 수련 기록 지우기 (Tools/Debug)
     public bool Finished { get; private set; }
+    public bool IsOnGoal(TutorialGoal goal) => !Finished && Current != null && Current.goal == goal && doneTimer < 0f; // 목표 표식(ObjectiveBeacon)용
 
     Transform player;
     PlayerCombat combat;
@@ -144,7 +146,7 @@ public class TutorialDirector : MonoBehaviour
         RenameTerms();
     }
 
-    // [변경] 씬에 저장된 단계 문구에 남은 옛 용어를 새 용어로 바꿈 (벽력일섬 → 섬뢰일도, 간파 → 역뢰)
+    // 씬에 저장된 단계 문구에 남은 옛 용어를 새 용어로 바꿈 (벽력일섬 → 섬뢰일도, 간파 → 역뢰)
     static readonly string[,] Terms = { { "벽력일섬", "섬뢰일도" }, { "간파", "역뢰" } };
 
     static string Rename(string text)
@@ -162,7 +164,13 @@ public class TutorialDirector : MonoBehaviour
             l.title = Rename(l.title);
             l.description = Rename(l.description);
             l.keys = Rename(l.keys);
+            if (l.goal == TutorialGoal.EnchantStrike && l.title == "뇌검 각성") // [변경] R이 뇌신 강림으로 바뀜 (씬에 저장된 예전 문구도 교체)
+            {
+                l.title = "뇌신 강림";
+                l.description = "뇌기 2칸으로 R. 6초 동안 빨라지고 휘두를 때마다 검기가 날아가며, 맞힌 적 주변으로 번개가 튑니다.";
+            }
         }
+        for (int i = 0; i < chapters.Length; i++) if (chapters[i] == "각성") chapters[i] = "강림"; // [변경]
     }
 
     void Update()
@@ -277,7 +285,7 @@ public class TutorialDirector : MonoBehaviour
         SetLineup(-1);
         if (exitBarrier != null) exitBarrier.SetActive(false);
         PlayerPrefs.SetInt(DoneKey, 1);
-        guide.ShowFinish("수련 완료", "북쪽 결계가 열렸습니다. 길을 따라 나가면 산문으로 이어집니다.");
+        guide.ShowFinish("수련 완료", "북쪽 결계가 열렸습니다. 길을 따라 나가면 마을로 돌아갑니다."); // 수련장 → 마을
     }
 
     // ESC 메뉴 "SKIP TUTORIAL"
@@ -371,7 +379,7 @@ public class TutorialDirector : MonoBehaviour
         L(2, 2, TutorialGoal.TapStrike, 1, "섬뢰일도", "Q를 짧게 누르면 가까운 적에게 번개처럼 돌진해 벱니다. 뇌기 1칸.", "Q 탭", fillGauge: true),
         L(2, 2, TutorialGoal.StanceDraw, 3, "발도 자세", "Q를 길게 누른 채 화면 가운데 조준점을 적에게 올려 표식 3개. 떼면 차례로 벱니다.", "Q 홀드 → 조준 → 떼기", fillGauge: true),
 
-        L(3, 2, TutorialGoal.EnchantStrike, 3, "뇌검 각성", "뇌기 2칸 이상에서 R. 각성 중엔 평타마다 낙뢰가 떨어집니다.", "R → 좌클릭", fillGauge: true),
+        L(3, 2, TutorialGoal.EnchantStrike, 3, "뇌신 강림", "뇌기 2칸으로 R. 6초 동안 빨라지고 휘두를 때마다 검기가 날아가며, 맞힌 적 주변으로 번개가 튑니다.", "R → 좌클릭", fillGauge: true), // [변경]
 
         L(4, -1, TutorialGoal.ShrineRest, 1, "화톳불", "수련장 가장자리의 화톳불 앞에서 E. 체력이 회복되고 스킬트리가 열립니다.", "E"),
         L(4, -1, TutorialGoal.UnlockSkill, 1, "스킬 해금", "스킬 포인트로 기술을 하나 해금하세요. 노드를 고르면 미리보기 영상이 나옵니다.", "클릭 → 해금"),

@@ -45,11 +45,23 @@ public class PlayerStats : MonoBehaviour
     public int Level => level;
     public int MaxLevel => maxLevel;
     public int Xp => xp;
-    public Vector4 Bonus => new Vector4(bonusPower, bonusSpeed, bonusCritChance, bonusCritDamage); // [변경] 씬 이동 때 RunState가 저장
+    public Vector4 Bonus => new Vector4(bonusPower, bonusSpeed, bonusCritChance, bonusCritDamage); // 씬 이동 때 RunState가 저장
     public int XpToNext => level >= maxLevel ? 0 : xpBase + xpStep * (level - 1);
     public bool UsesXp => useXp;
     public float AttackPower => attackPower + powerPerLevel * (level - 1) + bonusPower;
-    public float AttackSpeed => Mathf.Min(maxAttackSpeed, attackSpeed + speedPerLevel * (level - 1) + bonusSpeed);
+    public float AttackSpeed => Mathf.Min(maxAttackSpeed, attackSpeed + speedPerLevel * (level - 1) + bonusSpeed) * speedMultiplier; // [변경] 일시 배율
+
+    // [변경] 잠깐 걸리는 공속 배율 (R · 뇌신 강림). 바꾸면 애니메이션 속도도 바로 맞춤
+    float speedMultiplier = 1f;
+    public float SpeedMultiplier
+    {
+        get => speedMultiplier;
+        set
+        {
+            speedMultiplier = Mathf.Max(0.1f, value);
+            ApplySpeed();
+        }
+    }
     public float CritChance => Mathf.Clamp01(critChance + critChancePerLevel * (level - 1) + bonusCritChance);
     public float CritDamage => critDamage + critDamagePerLevel * (level - 1) + bonusCritDamage;
 
@@ -114,7 +126,7 @@ public class PlayerStats : MonoBehaviour
         if (logStats) Debug.Log($"[Stats] Lv {level} · 공격력 {AttackPower:P0} · 공속 {AttackSpeed:F2} · 치명 {CritChance:P0} · 치피 {CritDamage:P0}");
     }
 
-    // [변경] 씬 이동 뒤 이어받기: 레벨업 이벤트 없이 값만 (스킬 포인트가 다시 들어오지 않게)
+    // 씬 이동 뒤 이어받기: 레벨업 이벤트 없이 값만 (스킬 포인트가 다시 들어오지 않게)
     public void Restore(int savedLevel, int savedXp, Vector4 savedBonus)
     {
         level = Mathf.Clamp(savedLevel, 1, maxLevel);

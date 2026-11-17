@@ -154,7 +154,7 @@ public partial class EnemySwordsman
         if (localTime < attackReadyTime || dist <= data.AttackRange + 1f) return false;
 
         bool canLeap = data.LeapAttack != null && localTime >= leapReadyTime && dist >= data.LeapMinDistance && dist <= data.LeapMaxDistance;
-        bool canWave = (phase2 || data.WavePhase1) && data.WaveAttack != null && localTime >= waveReadyTime && dist >= data.WaveMinDistance; // [변경] 1페이즈에도
+        bool canWave = (phase2 || data.WavePhase1) && data.WaveAttack != null && localTime >= waveReadyTime && dist >= data.WaveMinDistance; // 1페이즈에도
         if (canLeap && canWave)
         {
             if (Random.value < 0.5f) canWave = false;
@@ -167,7 +167,7 @@ public partial class EnemySwordsman
         }
         if (canWave)
         {
-            waveReadyTime = localTime + data.WaveCooldown * (phase2 ? CooldownScale : data.WavePhase1CooldownScale); // [변경] 1페이즈는 더 드물게
+            waveReadyTime = localTime + data.WaveCooldown * (phase2 ? CooldownScale : data.WavePhase1CooldownScale); // 1페이즈는 더 드물게
             StartAttack(data.WaveAttack);
             Log("검기");
             return true;
@@ -524,7 +524,7 @@ public partial class EnemySwordsman
         dir = dir.sqrMagnitude > 0.01f ? dir.normalized : transform.forward;
         float s = transform.lossyScale.x;
         Vector3 origin = transform.position + Vector3.up * 1.1f * s + dir * 0.8f * s;
-        // [변경] 2페이즈는 가운데 + 좌우로 세 갈래 → 옆으로 비켜서는 것만으론 못 피함 (회피 · 점프)
+        // 2페이즈는 가운데 + 좌우로 세 갈래 → 옆으로 비켜서는 것만으론 못 피함 (회피 · 점프)
         int count = phase2 && data.Phase2WaveSpread > 0f ? 3 : 1;
         for (int i = 0; i < count; i++)
         {
@@ -593,7 +593,11 @@ public partial class EnemySwordsman
         float max = data.MaxHealth * healthScale;
         float damage = info.Damage;
         if (info.Weight == AttackWeight.Execution) damage = max * data.ExecutionDamageRatio;
-        else if (info.InstantKill) damage = max * data.InstantKillDamageRatio;
+        else
+        {
+            if (info.InstantKill) damage = max * data.InstantKillDamageRatio;
+            damage *= postureBroken ? data.BrokenDamageScale : data.NormalDamageScale; // [변경] 평소엔 조금, 그로기(체간 붕괴) 때 몰아서
+        }
 
         DamageInfo shown = info;
         shown.Damage = damage;

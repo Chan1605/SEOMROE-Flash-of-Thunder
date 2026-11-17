@@ -26,7 +26,7 @@ public class SettingsMenu : MonoBehaviour
     public bool IsOpen => root != null && root.activeSelf;
     public Font TitleFont => titleFont; // 결과 화면이 같은 글꼴을 씀
     public Font BodyFont => bodyFont;
-    public Font DisplayFont => Display; // [변경] 스킬트리 · 결과 화면이 같은 세리프를 빌려 씀
+    public Font DisplayFont => Display; // 스킬트리 · 결과 화면이 같은 세리프를 빌려 씀
     public event Action Closed; // 타이틀 화면에서 돌아갈 때 사용
 
     enum Page { Root, Display, Gameplay, Graphics, Audio, Quit }
@@ -242,6 +242,18 @@ public class SettingsMenu : MonoBehaviour
 
         float y = 590f;
         // 게임 중이고 타이틀 씬이 빌드에 있으면 타이틀로 돌아가기 (진행 상태는 버림)
+        // 본편 · 던전 · 수련장에서 마을로 (진행 상태는 이어받음)
+        // [변경] 연습장은 마을 포탈로 왔을 때만, 떠나기 전 저장본 그대로 돌아감 (전부 해금을 본편에 가져오지 않게). 타이틀에서 온 연습장은 숨김
+        string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        bool training = scene == "Training";
+        bool fromHub = scene == "Tutorial" || training;
+        if (inGame && scene != VillagePortal.VillageScene && (!training || RunState.HasFlag(VillagePortal.FromVillageFlag))
+            && Application.CanStreamedLevelBeLoaded(VillagePortal.VillageScene))
+        {
+            AddTextButton(content, "VILLAGE", 30, 170f, y, 340f, () => SceneTransition.Load(VillagePortal.VillageScene, true,
+                fromHub ? VillagePortal.TutorialReturnPoint : VillagePortal.ReturnPoint, training));
+            y += 62f;
+        }
         if (inGame && Application.CanStreamedLevelBeLoaded(TitleScreen.SceneName))
         {
             AddTextButton(content, "MAIN MENU", 30, 170f, y, 340f, () => SceneTransition.Load(TitleScreen.SceneName, false));

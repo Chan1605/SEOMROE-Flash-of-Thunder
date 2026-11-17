@@ -6707,8 +6707,7 @@ MonoBehaviour:
     count: 1
     title: "\uD328\uB9C1"
     description: "\uAC00\uB9CC\uD788 \uC120 \uCC44\uB85C \uC801\uC758 \uCE7C\uC774
-      \uB2FF\uAE30 \uC9C1\uC804\uC5D0 \uC6B0\uD074\uB9AD. \uB1CC\uAE30 1\uCE78\uC744
-      \uC501\uB2C8\uB2E4."
+      \uB2FF\uAE30 \uC9C1\uC804\uC5D0 \uC6B0\uD074\uB9AD"
     keys: "\uC6B0\uD074\uB9AD (\uB300\uAE30 \uC911)"
     fillGauge: 1
     skippable: 1
@@ -6719,7 +6718,7 @@ MonoBehaviour:
     title: "\uAC04\uD30C"
     description: "\uCF64\uBCF4 \uC911 \uC801\uC774 \uACF5\uACA9\uD558\uBA74 \uC6B0\uD074\uB9AD(\uAC15\uACF5\uACA9)\uC73C\uB85C
       \uB9DE\uBC1B\uC544\uCE58\uC138\uC694."
-    keys: "\uC88C\uD074\uB9AD \uCF64\uBCF4 \u2192 \uC6B0\uD074\uB9AD"
+    keys: "\uACF5\uACA9(\uC88C\uD074\uB9AD) \uC911 \u2192 \uC6B0\uD074\uB9AD"
     fillGauge: 0
     skippable: 1
   - chapter: 1
@@ -6739,7 +6738,7 @@ MonoBehaviour:
     title: "\uC77C\uC12C"
     description: "Q\uB97C \uC9E7\uAC8C \uB204\uB974\uBA74 \uAC00\uAE4C\uC6B4 \uC801\uC5D0\uAC8C
       \uBC88\uAC1C\uCC98\uB7FC \uB3CC\uC9C4\uD574 \uBCB1\uB2C8\uB2E4. \uB1CC\uAE30
-      1\uCE78."
+      1\uCE78 \uC18C\uBAA8"
     keys: "Q \uD0ED"
     fillGauge: 1
     skippable: 0
@@ -22273,6 +22272,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1452239952}
+  - component: {fileID: 1452239953}
   m_Layer: 0
   m_Name: Shrines
   m_TagString: Untagged
@@ -22296,6 +22296,29 @@ Transform:
   - {fileID: 1027700500}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1452239953
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1452239951}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d9a880ddd17409b862cd93e6fb75335, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObjectiveBeacon
+  showWhen: 3
+  zone: {fileID: 0}
+  tutorialGoal: 12
+  hideIfFlag: 
+  target: {fileID: 1027700500}
+  markerSettings: {fileID: 11400000, guid: f74bdcca98613cf4ba3c86443060f973, type: 2}
+  color: {r: 1, g: 0.62, b: 0.28, a: 1}
+  markerHeight: 3.4
+  arriveDistance: 2.6
+  beamHeight: 22
+  beamWidth: 0.9
 --- !u!1001 &1455283845
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -26276,6 +26299,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1730634862}
   - component: {fileID: 1730634861}
+  - component: {fileID: 1730634863}
   m_Layer: 0
   m_Name: TutorialExit
   m_TagString: Untagged
@@ -26295,10 +26319,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2c784dbc185e4d54f9ed21d5fb755814, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SceneExit
-  sceneName: SampleScene
+  sceneName: Village
   radius: 3.5
-  spawnAt: 
-  setFlag: 
+  spawnAt: VillagePortals/Portal_Tutorial/Arrive
+  setFlag: TutorialDone
   skipIfFlag: 
 --- !u!4 &1730634862
 Transform:
@@ -26316,6 +26340,29 @@ Transform:
   - {fileID: 331907556}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1730634863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1730634860}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d9a880ddd17409b862cd93e6fb75335, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObjectiveBeacon
+  showWhen: 1
+  zone: {fileID: 0}
+  tutorialGoal: 12
+  hideIfFlag: 
+  target: {fileID: 0}
+  markerSettings: {fileID: 11400000, guid: f74bdcca98613cf4ba3c86443060f973, type: 2}
+  color: {r: 0.95, g: 0.8, b: 0.45, a: 1}
+  markerHeight: 2.5
+  arriveDistance: 3
+  beamHeight: 40
+  beamWidth: 1.2
 --- !u!1001 &1731296625
 PrefabInstance:
   m_ObjectHideFlags: 0

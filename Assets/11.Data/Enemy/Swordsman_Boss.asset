@@ -56,9 +56,11 @@ MonoBehaviour:
   maxPosture: 120
   postureRegenDelay: 1.5
   postureRegenRate: 14
-  postureBreakStun: 3.5
+  postureBreakStun: 4.5
   parryPosture: 24
   executionDamageRatio: 0.25
+  normalDamageScale: 0.35
+  brokenDamageScale: 1.5
   instantKillDamageRatio: 0.12
   phase2Ratio: 0.5
   phase2Speed: 1.15

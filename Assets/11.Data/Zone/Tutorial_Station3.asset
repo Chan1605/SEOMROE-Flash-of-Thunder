@@ -20,6 +20,12 @@ MonoBehaviour:
   combatRadius: 10
   wallRadius: 13
   gateHalfWidth: 3.5
+  gateSouth: 1
+  gateNorth: 1
+  gateEast: 0
+  gateWest: 0
+  strength: 1
+  maxAttackers: 2
   terrainSize: 80
   hillHeight: 10
   hillNoise: 4

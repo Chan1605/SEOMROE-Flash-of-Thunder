@@ -10,7 +10,7 @@ using UnityEngine.UI;
 public class SceneTransition : MonoBehaviour
 {
     public const string LoadingScene = "Loading";
-    public const string MainScene = "InGame"; // [변경] 본편 씬 (예전 SampleScene)
+    public const string MainScene = "InGame"; // 본편 씬 (예전 SampleScene)
     const string LegacyMainScene = "SampleScene";
     const float FadeOut = 0.7f, FadeIn = 0.8f;
     const float LoadingFade = 0.35f;
@@ -21,18 +21,19 @@ public class SceneTransition : MonoBehaviour
 
     public static bool Busy => current != null;
 
-    public static void Load(string sceneName, bool carryState = true, string spawnAt = null) // spawnAt: 도착 씬에서 플레이어를 옮길 오브젝트 경로
+    // [변경] keepSnapshot: 지금 상태를 저장하지도 비우지도 않고 떠나기 직전 저장본을 그대로 씀 (연습장의 전부 해금을 본편에 가져오지 않게)
+    public static void Load(string sceneName, bool carryState = true, string spawnAt = null, bool keepSnapshot = false) // spawnAt: 도착 씬에서 플레이어를 옮길 오브젝트 경로
     {
         if (current != null) return;
-        if (sceneName == LegacyMainScene) sceneName = MainScene; // [변경] 씬·프리팹에 저장된 옛 이름도 새 본편 씬으로
+        if (sceneName == LegacyMainScene) sceneName = MainScene; // 씬·프리팹에 저장된 옛 이름도 새 본편 씬으로
         RunState.SpawnAt = spawnAt;
         var go = new GameObject("SceneTransition");
         DontDestroyOnLoad(go);
         current = go.AddComponent<SceneTransition>();
-        current.StartCoroutine(current.Run(sceneName, carryState));
+        current.StartCoroutine(current.Run(sceneName, carryState, keepSnapshot));
     }
 
-    IEnumerator Run(string sceneName, bool carryState)
+    IEnumerator Run(string sceneName, bool carryState, bool keepSnapshot)
     {
         Canvas canvas = UIKit.CreateCanvas(transform, "Fade", 500); // 메뉴보다 위
         cover = UIKit.Image(canvas.transform, null, new Color(0f, 0f, 0f, 0f));
@@ -40,7 +41,8 @@ public class SceneTransition : MonoBehaviour
 
         yield return Fade(0f, 1f, FadeOut);
 
-        if (carryState) RunState.Capture();
+        if (keepSnapshot) { } // [변경]
+        else if (carryState) RunState.Capture();
         else RunState.Clear();
         if (GamePause.IsPaused) GamePause.Set(false);
         Time.timeScale = 1f;

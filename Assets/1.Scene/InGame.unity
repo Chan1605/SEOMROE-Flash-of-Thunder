@@ -38210,6 +38210,7 @@ GameObject:
   m_Component:
   - component: {fileID: 496697936}
   - component: {fileID: 496697935}
+  - component: {fileID: 496697937}
   m_Layer: 0
   m_Name: DungeonEntrance
   m_TagString: Untagged
@@ -160459,6 +160460,29 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1334049015609169430, guid: 519e6076f1bfe524ca7ca71ea0792d5a, type: 3}
   m_PrefabInstance: {fileID: 691197802}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &496697937
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 496697934}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d9a880ddd17409b862cd93e6fb75335, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObjectiveBeacon
+  showWhen: 2
+  zone: {fileID: 1322562297}
+  tutorialGoal: 12
+  hideIfFlag: DungeonCleared
+  target: {fileID: 0}
+  markerSettings: {fileID: 11400000, guid: f74bdcca98613cf4ba3c86443060f973, type: 2}
+  color: {r: 0.95, g: 0.8, b: 0.45, a: 1}
+  markerHeight: 2.5
+  arriveDistance: 3
+  beamHeight: 40
+  beamWidth: 1.2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

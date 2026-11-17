@@ -30,6 +30,7 @@ public class TitleScreen : MonoBehaviour
     [SerializeField] string tutorialScene = "Tutorial";
     [SerializeField] string mainScene = "InGame";
     [SerializeField] string trainingScene = "Training";
+    [SerializeField] string villageScene = "Village"; // [변경] START GAME → 마을
     [SerializeField] Color accent = new Color(0.95f, 0.8f, 0.45f);
     [SerializeField] Color bolt = new Color(0.62f, 0.82f, 1f);
     [SerializeField] Vector2 flashInterval = new Vector2(5f, 10f);
@@ -120,7 +121,7 @@ public class TitleScreen : MonoBehaviour
         Center(press.rectTransform, 960f, 965f, 800f, 40f);
 
         // 고른 항목 뒤 붓질 + 왼쪽 마름모
-        brush = UIKit.Image(c, UIKit.BrushStroke(512, 96), new Color(accent.r, accent.g, accent.b, 0f)); // [변경] 붓질 생성은 설정 메뉴와 같이 쓰려고 UIKit으로 옮김
+        brush = UIKit.Image(c, UIKit.BrushStroke(512, 96), new Color(accent.r, accent.g, accent.b, 0f)); // 붓질 생성은 설정 메뉴와 같이 쓰려고 UIKit으로 옮김
         brush.raycastTarget = false;
         UIKit.Place(brush.rectTransform, MenuX - 60f, 0f, 520f, 74f);
         diamond = UIKit.Image(c, null, new Color(accent.r, accent.g, accent.b, 0f));
@@ -132,7 +133,7 @@ public class TitleScreen : MonoBehaviour
         menuRoot = NewRoot(c, "Menu");
         menuGroup = menuRoot.AddComponent<CanvasGroup>();
         float y = 470f;
-        AddItem(menuItems, menuRoot.transform, serif, "NEW GAME", "새로 시작", ref y, NewGame);
+        AddItem(menuItems, menuRoot.transform, serif, "NEW GAME", "새 게임", ref y, NewGame); // [변경]
         if (Application.CanStreamedLevelBeLoaded(trainingScene)) AddItem(menuItems, menuRoot.transform, serif, "TRAINING", "자유 연습", ref y, () => Go(trainingScene));
         AddItem(menuItems, menuRoot.transform, serif, "SETTINGS", "환경 설정", ref y, OpenSettings);
         AddItem(menuItems, menuRoot.transform, serif, "QUIT", "종료", ref y, Quit);
@@ -264,6 +265,12 @@ public class TitleScreen : MonoBehaviour
 
     void NewGame()
     {
+        // [변경] 마을이 빌드에 있으면 항상 마을로 (수련장은 마을 포탈에서). 없을 때만 예전 선택지
+        if (Application.CanStreamedLevelBeLoaded(villageScene))
+        {
+            Go(villageScene);
+            return;
+        }
         if (!TutorialDirector.CompletedBefore)
         {
             Go(tutorialScene);

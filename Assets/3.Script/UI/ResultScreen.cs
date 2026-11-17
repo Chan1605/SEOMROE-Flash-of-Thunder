@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 보스 처치 결과 화면 (RunRecord.Finished). 게임을 멈추고 기록을 한 줄씩 띄운 뒤 랭크를 찍음
-// [변경] 타이틀과 같은 모양: VICTORY(세리프) + ◆── 장식선 + "토벌 완료", 줄마다 마름모, 랭크 뒤 붓질
+// 타이틀과 같은 모양: VICTORY(세리프) + ◆── 장식선 + "토벌 완료", 줄마다 마름모, 랭크 뒤 붓질
 //  - CONTINUE: 닫고 이어서 (시련의 터) · MAIN MENU: 타이틀로 (Title 씬이 빌드에 있을 때만)
 public class ResultScreen : MonoBehaviour
 {
@@ -129,8 +129,14 @@ public class ResultScreen : MonoBehaviour
         bottom.raycastTarget = false;
         UIKit.Place(bottom.rectTransform, x, 860f, 900f, 1f);
         AddButton(buttons.transform, "CONTINUE", x, Continue);
+        float next = x + 300f;
+        if (Application.CanStreamedLevelBeLoaded(VillagePortal.VillageScene)) // [변경] 마을로 돌아가기 (진행 상태 이어받음)
+        {
+            AddButton(buttons.transform, "VILLAGE", next, () => SceneTransition.Load(VillagePortal.VillageScene, true, VillagePortal.ReturnPoint));
+            next += 300f;
+        }
         if (Application.CanStreamedLevelBeLoaded(TitleScreen.SceneName))
-            AddButton(buttons.transform, "MAIN MENU", x + 300f, () => SceneTransition.Load(TitleScreen.SceneName, false));
+            AddButton(buttons.transform, "MAIN MENU", next, () => SceneTransition.Load(TitleScreen.SceneName, false));
         Text hint = UIKit.Text(buttons.transform, "CONTINUE: 계속 탐험 · 시련의 터 도전", bodyFont, 20, new Color(1f, 1f, 1f, 0.4f), TextAnchor.MiddleLeft);
         UIKit.Place(hint.rectTransform, x, 960f, 800f, 30f);
     }

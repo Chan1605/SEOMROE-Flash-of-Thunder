@@ -79,6 +79,8 @@ public class EnemyData : ScriptableObject
     [SerializeField] float parryPosture = 30f;        // 간파·패링 한 번에 쌓이는 체간
     [SerializeField] float postureTakenScale = 0.5f;  // 공격으로 받는 체간 배율 (간파·패링은 parryPosture 그대로)
     [SerializeField, Range(0.05f, 1f)] float executionDamageRatio = 0.25f;
+    [SerializeField, Range(0.05f, 1f)] float normalDamageScale = 0.35f; // [변경] 평소(체간 붕괴 전) 받는 피해 배율 → 체간을 무너뜨려야 크게 깎임
+    [SerializeField] float brokenDamageScale = 1.5f;                    // [변경] 체간 붕괴 중 받는 피해 배율 (처형 피해는 별도)
     [SerializeField, Range(0.01f, 1f)] float instantKillDamageRatio = 0.12f; // 일섬 즉사(뇌인 가득)는 보스에게 이 비율 피해
     [SerializeField, Range(0.1f, 0.9f)] float phase2Ratio = 0.5f;
     [SerializeField] float phase2Speed = 1.15f;       // 2페이즈 동작 배속
@@ -134,9 +136,9 @@ public class EnemyData : ScriptableObject
     [SerializeField] float waveWidth = 2.2f;
     [SerializeField] float waveDamage = 16f;
     [SerializeField] float waveCooldown = 6f;
-    [SerializeField] bool wavePhase1 = true;              // [변경] 1페이즈에도 검기 (쿨타임 × wavePhase1CooldownScale)
+    [SerializeField] bool wavePhase1 = true;              // 1페이즈에도 검기 (쿨타임 × wavePhase1CooldownScale)
     [SerializeField] float wavePhase1CooldownScale = 1.5f;
-    [SerializeField] float phase2WaveSpread = 20f;        // [변경] 2페이즈 검기를 이 각도로 세 갈래 (0이면 한 줄기)
+    [SerializeField] float phase2WaveSpread = 20f;        // 2페이즈 검기를 이 각도로 세 갈래 (0이면 한 줄기)
 
     public EnemyKind Kind => kind;
     public float MaxHealth => maxHealth;
@@ -196,6 +198,8 @@ public class EnemyData : ScriptableObject
     public float ParryPosture => parryPosture;
     public float PostureTakenScale => postureTakenScale;
     public float ExecutionDamageRatio => executionDamageRatio;
+    public float NormalDamageScale => normalDamageScale; // [변경]
+    public float BrokenDamageScale => brokenDamageScale; // [변경]
     public float InstantKillDamageRatio => instantKillDamageRatio;
     public float Phase2Ratio => phase2Ratio;
     public float Phase2Speed => phase2Speed;

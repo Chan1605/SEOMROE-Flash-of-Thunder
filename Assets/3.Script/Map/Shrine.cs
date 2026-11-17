@@ -11,6 +11,9 @@ public class Shrine : MonoBehaviour
     [SerializeField] float flickerSpeed = 7f;
     [SerializeField] bool logRest;
 
+    // 한눈에 휴식처로 보이게: 위로 오르는 불티 · 바닥의 따뜻한 빛 고리 (실행 중에 만듦) // [변경] 머리 위 이름 표시 제거
+    static readonly Color Warm = new Color(1f, 0.62f, 0.28f);
+
     Transform player;
     PlayerHealth health;
     float baseIntensity;
@@ -21,6 +24,7 @@ public class Shrine : MonoBehaviour
     {
         if (fireLight != null) baseIntensity = fireLight.intensity;
         seed = Random.value * 100f;
+        BuildLook();
     }
 
     void Start()
@@ -63,6 +67,63 @@ public class Shrine : MonoBehaviour
         if (health != null) health.HealFull();
         menu.Open();
         if (logRest) Debug.Log($"[Shrine] {name}에서 휴식");
+    }
+
+    // ===== 휴식처 표시 =====
+    void BuildLook()
+    {
+        var mat = new Material(Shader.Find("Sprites/Default"));
+
+        // 위로 오르는 불티
+        var ps = new GameObject("Embers").AddComponent<ParticleSystem>();
+        ps.transform.SetParent(transform, false);
+        ps.transform.localPosition = new Vector3(0f, 1.5f, 0f);
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        ParticleSystem.MainModule main = ps.main;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(1.5f, 2.8f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.6f, 1.4f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
+        main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.45f, 0.15f), new Color(1f, 0.8f, 0.4f));
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.useUnscaledTime = true;
+        ParticleSystem.ShapeModule shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle = 12f;
+        shape.radius = 0.15f;
+        shape.rotation = new Vector3(-90f, 0f, 0f);
+        ParticleSystem.NoiseModule noise = ps.noise;
+        noise.enabled = true;
+        noise.strength = 0.4f;
+        noise.frequency = 0.8f;
+        ParticleSystem.ColorOverLifetimeModule col = ps.colorOverLifetime;
+        col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                  new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.6f), new GradientAlphaKey(0f, 1f) });
+        col.color = g;
+        ParticleSystem.EmissionModule em = ps.emission;
+        em.rateOverTime = 14f;
+        var pr = ps.GetComponent<ParticleSystemRenderer>();
+        pr.sharedMaterial = mat;
+        pr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        ps.Play();
+
+        // 바닥의 빛 고리 (휴식 범위)
+        var ring = new GameObject("RestRing").AddComponent<LineRenderer>();
+        ring.transform.SetParent(transform, false);
+        ring.sharedMaterial = mat;
+        ring.useWorldSpace = false;
+        ring.loop = true;
+        ring.widthMultiplier = 0.06f;
+        ring.startColor = ring.endColor = new Color(Warm.r, Warm.g, Warm.b, 0.55f);
+        ring.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        const int Segments = 48;
+        ring.positionCount = Segments;
+        for (int i = 0; i < Segments; i++)
+        {
+            float a = i * Mathf.PI * 2f / Segments;
+            ring.SetPosition(i, new Vector3(Mathf.Cos(a) * interactRange, 0.06f, Mathf.Sin(a) * interactRange));
+        }
     }
 
     void OnDrawGizmosSelected()
