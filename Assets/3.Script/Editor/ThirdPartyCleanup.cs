@@ -11,7 +11,8 @@ using UnityEngine;
 //  - 젠이츠 칼: Player 프리팹에서 빼고 모델 폴더와 칼 전환용 셋업 스크립트를 지움 (Samurai 팩 칼로 확정)
 //  - 안 쓰는 기능 정리: 저스트 회피 반격 · 손 축 보정(WeaponBoneRetarget) · 잔심 자세(Skill_Finish)의 데이터·상태·스크립트
 //  - 팩 프리팹의 빠진 스크립트 컴포넌트 제거 (원본 팩에 없는 스크립트를 참조해 실행 중 경고가 뜸)
-//  - [변경] 옛 맵 소스: 실사 숲으로 바꾼 뒤 안 쓰는 Toon Fantasy Nature 에셋 · 설치 패키지 · 옛 수련장/백업 테마 · 자동 변환 지형 레이어
+//  - 옛 맵 소스: 실사 숲으로 바꾼 뒤 안 쓰는 Toon Fantasy Nature 에셋 · 설치 패키지 · 옛 수련장/백업 테마 · 자동 변환 지형 레이어
+//  - [변경] 숲 팩(NatureManufacture, git 제외): 씬 · 테마 · 지형이 안 쓰는 모델 · 질감 · 데모 · 설치 패키지 삭제 + 질감 최대 2K
 // 먼저 "(미리보기)" 메뉴로 콘솔에서 지울 목록을 확인한 뒤 실행
 public static class ThirdPartyCleanup
 {
@@ -137,7 +138,7 @@ public static class ThirdPartyCleanup
         }
     }
 
-    // [변경] 옛 맵 소스 정리
+    // 옛 맵 소스 정리
     const string ToonRoot = "Assets/ThirdParty/Toon Fantasy Nature";
     const string ZoneData = "Assets/11.Data/Zone/";
     static readonly string[] OldMapFolders = { ZoneData + "Toon Backup", "Assets/_TerrainAutoUpgrade" };
@@ -200,6 +201,85 @@ public static class ThirdPartyCleanup
             .Select(AssetDatabase.GUIDToAssetPath)
             .Where(p => !AssetDatabase.IsValidFolder(p))
             .Distinct();
+
+    // [변경] 숲 팩 정리 (git에 안 올라가는 폴더 → 디스크만 줄어듦, 필요하면 에셋 스토어에서 다시 Import)
+    const string ForestRoot = "Assets/NatureManufacture Assets";
+    static readonly string[] ForestKeepFolders =
+    {
+        ForestRoot + "/Forest Environment Dynamic Nature/Terrain Layers", // ForestPackSetup이 원본에서 무광 사본을 만듦
+        ForestRoot + "/NatureManufacture Wind",
+    };
+    // 셰이더 include · 스크립트는 의존성 목록에 안 잡혀서 확장자로 보존
+    static readonly string[] CodeExtensions = { ".cs", ".shader", ".shadergraph", ".shadersubgraph", ".hlsl", ".cginc", ".compute", ".asmdef", ".dll" };
+
+    [MenuItem("Tools/Cleanup/Trim Forest Pack (미리보기)")]
+    static void ForestPreview() => TrimForest(false);
+
+    [MenuItem("Tools/Cleanup/Trim Forest Pack")]
+    static void ForestRun()
+    {
+        if (!EditorUtility.DisplayDialog("숲 팩 정리", "씬 · 테마 · 지형이 쓰지 않는 숲 팩 파일을 지웁니다.\n(git에 없는 폴더라 되돌리려면 에셋 스토어에서 다시 Import)", "정리", "취소")) return;
+        TrimForest(true);
+    }
+
+    // 핵심: 지울 후보 = 숲 팩 전체. 팩 밖 씬 · 프리팹 · 데이터가 의존하는 것 + 지형 레이어 원본 · 바람 · 셰이더 코드는 보존
+    static void TrimForest(bool delete)
+    {
+        if (!AssetDatabase.IsValidFolder(ForestRoot)) { Debug.Log("[Cleanup] 숲 팩이 없습니다."); return; }
+
+        List<string> candidates = FilesIn(ForestRoot).ToList();
+        var candidateSet = new HashSet<string>(candidates);
+        string[] users = AssetDatabase.GetAllAssetPaths()
+            .Where(p => p.StartsWith("Assets/") && !candidateSet.Contains(p))
+            .Where(p => p.EndsWith(".unity") || p.EndsWith(".prefab") || p.EndsWith(".asset") || p.EndsWith(".mat") ||
+                        p.EndsWith(".controller") || p.EndsWith(".terrainlayer") || p.EndsWith(".playable"))
+            .ToArray();
+        var used = new HashSet<string>(AssetDatabase.GetDependencies(users, true));
+        string[] keepRoots = ForestKeepFolders.Where(AssetDatabase.IsValidFolder).SelectMany(FilesIn).ToArray();
+        used.UnionWith(AssetDatabase.GetDependencies(keepRoots, true));
+
+        List<string> remove = candidates
+            .Where(p => !used.Contains(p) && !CodeExtensions.Any(e => p.EndsWith(e, System.StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        long bytes = remove.Sum(p => File.Exists(p) ? new FileInfo(p).Length : 0L);
+        long keepBytes = candidates.Except(remove).Sum(p => File.Exists(p) ? new FileInfo(p).Length : 0L);
+        Debug.Log($"[Cleanup] 숲 팩 {candidates.Count}개 중 삭제 {remove.Count}개 ({bytes / 1048576f:0}MB) · 남김 {candidates.Count - remove.Count}개 ({keepBytes / 1048576f:0}MB)\n" +
+                  "삭제(폴더별 개수):\n" + string.Join("\n", remove.GroupBy(p => Path.GetDirectoryName(p)).OrderBy(g => g.Key).Select(g => $"{g.Count(),4}  {g.Key}")));
+        if (!delete) return;
+
+        var failed = new List<string>();
+        AssetDatabase.DeleteAssets(remove.ToArray(), failed);
+        DeleteEmptyFolders(ForestRoot);
+        AssetDatabase.Refresh();
+        Debug.Log(failed.Count == 0 ? "[Cleanup] 숲 팩 정리 완료" : "[Cleanup] 지우지 못한 파일:\n" + string.Join("\n", failed));
+    }
+
+    // [변경] 숲 팩 질감 최대 크기 4K → 2K: Library(가져온 질감 캐시) · 빌드 용량이 크게 줄고 화면 차이는 거의 없음
+    [MenuItem("Tools/Cleanup/Limit Forest Pack Textures (2K)")]
+    static void LimitForestTextures()
+    {
+        if (!AssetDatabase.IsValidFolder(ForestRoot)) return;
+        string[] paths = AssetDatabase.FindAssets("t:Texture2D", new[] { ForestRoot }).Select(AssetDatabase.GUIDToAssetPath).Distinct().ToArray();
+        int changed = 0;
+        AssetDatabase.StartAssetEditing();
+        try
+        {
+            for (int i = 0; i < paths.Length; i++)
+            {
+                if (EditorUtility.DisplayCancelableProgressBar("질감 2K 제한", paths[i], (float)i / paths.Length)) break;
+                if (!(AssetImporter.GetAtPath(paths[i]) is TextureImporter importer) || importer.maxTextureSize <= 2048) continue;
+                importer.maxTextureSize = 2048;
+                importer.SaveAndReimport();
+                changed++;
+            }
+        }
+        finally
+        {
+            AssetDatabase.StopAssetEditing();
+            EditorUtility.ClearProgressBar();
+        }
+        Debug.Log($"[Cleanup] 숲 팩 질감 {paths.Length}개 중 {changed}개를 최대 2K로");
+    }
 
     [MenuItem("Tools/Cleanup/Remove Zenitsu Katana")]
     static void RemoveZenitsu()

@@ -202,6 +202,8 @@ public static class ForestPackSetup
         ApplyLookTo(theme, set, mood);
         // 본편만 지형까지 다시 만듦 → 자연스러운 언덕 · S자 길 · 완만한 길가 (다른 씬은 소품만 다시 만들어서 지형 값은 안 바꿈)
         theme.pathMeander = 7f;
+        theme.bridges = set.bridges; // 본편만: 굽은 길 위 나무다리 후보 (프리팹 보존용)
+        theme.placeBridges = false;  // [변경] 사용자: 다리 모양이 어색해 보류 → 다시 생성해도 안 놓음 (테마에서 켜면 놓임)
         theme.corridorFade = 11f;
         EditorUtility.SetDirty(theme);
         AssetDatabase.SaveAssets();
@@ -238,7 +240,7 @@ public static class ForestPackSetup
         }
         else // 밤: 카툰 남색 하늘 대신 어두운 사실적 밤하늘 + 짙은 남색 안개 (달빛 색 · 각도는 원래 테마)
         {
-            theme.skybox = SkyMaterial("Forest_Sky_Night", new Color(0.2f, 0.25f, 0.36f), 0.4f, 0.02f, 1.02f); // [변경] 사용자 조정값 (하늘 노출 0.2 → 1.02)
+            theme.skybox = SkyMaterial("Forest_Sky_Night", new Color(0.2f, 0.25f, 0.36f), 0.4f, 0.02f, 2.65f); // [변경] 사용자 조정값 (하늘 노출 → 2.65)
             theme.fogColor = new Color(0.07f, 0.09f, 0.13f);
             theme.fogDensity = 0.02f;
         }
@@ -304,8 +306,8 @@ public static class ForestPackSetup
         }
         else if (mood == Mood.Night)
         {
-            // [변경] 사용자 조정값 (던전 확인): 노출 0.45 → 0.7, 감마 0.06 → 0.1
-            exposure = 0.7f; contrast = 12f; saturation = -14f; temperature = -10f; bloomIntensity = 0.6f; vignetteIntensity = 0.3f;
+            // 사용자 조정값 (던전 확인)
+            exposure = 1f; contrast = 12f; saturation = -14f; temperature = -10f; bloomIntensity = 0.6f; vignetteIntensity = 0.3f; // [변경] 사용자 조정값: 노출 0.7 → 1
             gamma = 0.1f; gain = 0.08f;
             shadows = new Vector4(0.818f, 0.864f, 1f, 0.08f); // 그늘은 푸르게 · 적 실루엣만 보일 만큼 들어 올림
             highlights = new Vector4(1f, 1f, 1f, 0f);
@@ -424,7 +426,11 @@ public static class ForestPackSetup
         theme.gateMaterial = set.lacquer;
         theme.gateTrimMaterial = set.blackWood;
         theme.gateBaseMaterial = set.stone;
-        if (theme.landmarks != null && theme.landmarks.Length > 0 && set.shrine != null) theme.landmarks = new[] { set.shrine };
+        if (theme.landmarks != null && theme.landmarks.Length > 0 && set.shrine != null)
+        {
+            theme.landmarks = new[] { set.shrine };
+            theme.landmarkStairs = set.stairs; // 정자 앞 돌계단
+        }
         if (set.groundLayer != null) theme.groundLayer = set.groundLayer;
         if (set.arenaLayer != null) theme.arenaLayer = set.arenaLayer;
         if (set.roadLayer != null) theme.roadLayer = set.roadLayer;
@@ -434,8 +440,9 @@ public static class ForestPackSetup
     {
         public GameObject[] trees, wallRocks, innerRocks, arenaCover, outerCover, pathStones;
         public GameObject leaves, shrine;
-        public GameObject[] detailGrass, detailPlants, slopeRocks;
-        public Material lacquer, blackWood, stone;
+        public GameObject[] detailGrass, detailPlants, slopeRocks, stairs, bridges;
+        public Material lacquer, blackWood, stone, naturalWood;
+        public GameObject post, table, bench, fence; // 마을 소품
         public TerrainLayer groundLayer, arenaLayer, roadLayer;
     }
 
@@ -474,6 +481,8 @@ public static class ForestPackSetup
                 Prefabs("Stumps Roots and Branches/Prefabs Leaves Cover/prefab_beech_forest_scarp_0{0}_Leaves.prefab", "1", "2", "1_U", "2_U"),
                 Prefabs("Stumps Roots and Branches/Prefabs Moss Cover/prefab_sandy_slope _0{0}_Moss.prefab", "1", "3", "5")),
             leaves = AssetDatabase.LoadAssetAtPath<GameObject>(Root + "Particles/prefab_Leafs Forest.prefab"),
+            stairs = Prefabs("Small Architecture/Stairs/Prefabs/prefab_beech_forest_stair_01_{0}.prefab", "1", "2", "3"),
+            bridges = Prefabs("Small Architecture/Bridge/Prefabs/Prefab_Bridge_{0}.prefab", "1", "2", "3", "4"),
             groundLayer = Layer("Terrain_Layer5_Leaves", 0.3f), // 사본 · 광택 상한
             arenaLayer = Layer("Terrain_Layer2_Soil", 0.25f),
             roadLayer = Layer("Terrain_Layer3_Soil_Wet", 0.45f),
@@ -497,6 +506,8 @@ public static class ForestPackSetup
         set.stone = TexMaterial("Torii_Stone", new Color(0.85f, 0.85f, 0.82f), 0.25f, new Vector2(1f, 1f), StoneTex + "BC_SM.tga", StoneTex + "N.png");
         Material roof = WoodMaterial("Shrine_Roof", new Color(0.2f, 0.17f, 0.15f), 0.2f, new Vector2(4f, 4f));
         set.shrine = BuildShrine(set, roof);
+        set.naturalWood = WoodMaterial("Wood_Natural", new Color(0.5f, 0.4f, 0.3f), 0.25f, new Vector2(1f, 1f));
+        BuildVillageProps(set);
     }
 
     // 다리 나무 질감에 색을 곱해 결이 보이는 옻칠 · 검은 나무
@@ -534,7 +545,7 @@ public static class ForestPackSetup
         Material red = set.lacquer, black = set.blackWood, stone = set.stone != null ? set.stone : black;
         var root = new GameObject("Forest_Shrine");
         Box(root.transform, "Platform", new Vector3(0f, -0.75f, 0f), new Vector3(5.8f, 2.5f, 5.8f), stone, true);
-        Box(root.transform, "Step", new Vector3(0f, 0.15f, -3.35f), new Vector3(2f, 0.3f, 0.9f), stone, true);
+        Box(root.transform, "Step", new Vector3(0f, 0.15f, 3.35f), new Vector3(2f, 0.3f, 0.9f), stone, true); // 앞(+Z, 공터 쪽)으로
         foreach (float sx in new[] { -1f, 1f })
         foreach (float sz in new[] { -1f, 1f })
             Cylinder(root.transform, "Post", new Vector3(sx * 2.3f, 2f, sz * 2.3f), new Vector3(0.34f, 1.5f, 0.34f), red, true);
@@ -542,8 +553,8 @@ public static class ForestPackSetup
         Box(root.transform, "Beam_B", new Vector3(0f, 3.45f, 2.3f), new Vector3(5f, 0.28f, 0.28f), red, false);
         Box(root.transform, "Beam_L", new Vector3(-2.3f, 3.45f, 0f), new Vector3(0.28f, 0.28f, 5f), red, false);
         Box(root.transform, "Beam_R", new Vector3(2.3f, 3.45f, 0f), new Vector3(0.28f, 0.28f, 5f), red, false);
-        Box(root.transform, "Altar", new Vector3(0f, 1f, 1.2f), new Vector3(1.4f, 1f, 0.9f), black, true);
-        Box(root.transform, "Altar_Top", new Vector3(0f, 1.55f, 1.2f), new Vector3(1.6f, 0.1f, 1.1f), red, false);
+        Box(root.transform, "Altar", new Vector3(0f, 1f, -1.2f), new Vector3(1.4f, 1f, 0.9f), black, true); // 뒤쪽으로
+        Box(root.transform, "Altar_Top", new Vector3(0f, 1.55f, -1.2f), new Vector3(1.6f, 0.1f, 1.1f), red, false);
 
         var roofGo = new GameObject("Roof");
         roofGo.transform.SetParent(root.transform, false);
@@ -604,6 +615,91 @@ public static class ForestPackSetup
         mesh.RecalculateBounds();
         EditorUtility.SetDirty(mesh);
         return mesh;
+    }
+
+    // 마을 소품 (카툰 대신): 등불 기둥 · 탁자 · 긴 의자 · 울타리. 원래 소품과 같은 자리 · 방향에 바꿔 끼움
+    static void BuildVillageProps(PackSet set)
+    {
+        Material wood = set.naturalWood, dark = set.blackWood, stone = set.stone;
+
+        var post = new GameObject("Forest_LanternPost"); // 등불 상자(3.3m)는 마을 셋업이 따로 둠 → 기둥 · 받침 · 갓만
+        Box(post.transform, "Base", new Vector3(0f, 0.15f, 0f), new Vector3(0.5f, 0.3f, 0.5f), stone, true);
+        Cylinder(post.transform, "Pole", new Vector3(0f, 1.55f, 0f), new Vector3(0.17f, 1.5f, 0.17f), dark, true);
+        Box(post.transform, "Cap", new Vector3(0f, 3.66f, 0f), new Vector3(0.7f, 0.08f, 0.7f), dark, false);
+        Box(post.transform, "Cap_Top", new Vector3(0f, 3.74f, 0f), new Vector3(0.36f, 0.08f, 0.36f), dark, false);
+        set.post = SavePrefab(post);
+
+        var table = new GameObject("Forest_Table");
+        Box(table.transform, "Top", new Vector3(0f, 0.74f, 0f), new Vector3(1.8f, 0.08f, 0.9f), wood, true);
+        foreach (float x in new[] { -0.8f, 0.8f })
+        foreach (float z in new[] { -0.36f, 0.36f })
+            Box(table.transform, "Leg", new Vector3(x, 0.35f, z), new Vector3(0.08f, 0.7f, 0.08f), dark, false);
+        set.table = SavePrefab(table);
+
+        var bench = new GameObject("Forest_Bench");
+        Box(bench.transform, "Seat", new Vector3(0f, 0.45f, 0f), new Vector3(1.3f, 0.07f, 0.38f), wood, true);
+        foreach (float x in new[] { -0.55f, 0.55f })
+            Box(bench.transform, "Leg", new Vector3(x, 0.21f, 0f), new Vector3(0.07f, 0.42f, 0.34f), dark, false);
+        set.bench = SavePrefab(bench);
+
+        var fence = new GameObject("Forest_Fence"); // 긴 축 = +Z (원래 울타리처럼 둘레 방향으로 놓임)
+        foreach (float z in new[] { -1.1f, 1.1f })
+            Cylinder(fence.transform, "Post", new Vector3(0f, 0.6f, z), new Vector3(0.12f, 0.6f, 0.12f), dark, true);
+        foreach (float y in new[] { 0.45f, 0.95f })
+            Box(fence.transform, "Rail", new Vector3(0f, y, 0f), new Vector3(0.06f, 0.08f, 2.4f), wood, true);
+        set.fence = SavePrefab(fence);
+    }
+
+    static GameObject SavePrefab(GameObject root)
+    {
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, $"{StructureFolder}/{root.name}.prefab");
+        Object.DestroyImmediate(root);
+        return prefab;
+    }
+
+    // 마을 씬의 카툰 소품(VillageProps)을 같은 자리 · 방향의 숲 소품으로 바꿈. 화톳불 · 포탈 · 등불 상자는 그대로
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/Village Props")]
+    static void VillageProps()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+        string returnTo = EditorSceneManager.GetActiveScene().path;
+        var scene = EditorSceneManager.OpenScene("Assets/1.Scene/Village.unity", OpenSceneMode.Single);
+
+        var set = Load();
+        GameObject root = GameObject.Find("VillageProps");
+        int replaced = 0;
+        if (root != null)
+        {
+            var children = new List<Transform>();
+            foreach (Transform child in root.transform) children.Add(child);
+            foreach (Transform child in children)
+            {
+                GameObject source = PrefabUtility.GetCorrespondingObjectFromSource(child.gameObject);
+                string kind = source != null ? source.name : child.name;
+                GameObject replacement = kind.Contains("Pavilion") ? set.shrine
+                    : kind.Contains("Table") ? set.table
+                    : kind.Contains("Chair") ? set.bench
+                    : kind.Contains("Fence") ? set.fence
+                    : kind.Contains("Pole") ? set.post
+                    : null;
+                if (replacement == null) continue;
+
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(replacement, root.transform);
+                go.name = child.name.StartsWith("LanternPost") ? child.name : replacement.name;
+                go.transform.SetPositionAndRotation(child.position, child.rotation);
+                go.transform.SetSiblingIndex(child.GetSiblingIndex());
+                Undo.RegisterCreatedObjectUndo(go, "Village Props");
+                Undo.DestroyObjectImmediate(child.gameObject);
+                replaced++;
+            }
+        }
+        else Debug.LogWarning("[ForestPack] Village 씬에 VillageProps가 없습니다.");
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        if (!string.IsNullOrEmpty(returnTo) && returnTo != scene.path) EditorSceneManager.OpenScene(returnTo, OpenSceneMode.Single);
+        Debug.Log($"[ForestPack] 마을 소품 {replaced}개를 숲 소품으로 교체 · 저장 완료");
     }
 
     static GameObject Box(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat, bool collider) =>

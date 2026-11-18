@@ -680,7 +680,7 @@ public static class ZoneGenerator
         }
 
         GameObject barrier = Part(gate.transform, "Barrier", new Vector3(0f, 2.5f, 0f), new Vector3(w * 2f, 5f, 0.3f), barrierMat, true);
-        if (t.gateMaterial != null) FitBarrier(barrier.transform, t); // [변경] 도리이 관목 아래로
+        if (t.gateMaterial != null) FitBarrier(barrier.transform, t); // 도리이 관목 아래로
         barrier.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
         return barrier;
     }
@@ -796,11 +796,11 @@ public static class ZoneGenerator
                 if (gate.GetChild(i).name != "Barrier") Undo.DestroyObjectImmediate(gate.GetChild(i).gameObject);
             BuildTorii(gate, t);
             Transform barrier = gate.Find("Barrier");
-            if (barrier != null) { Undo.RecordObject(barrier, "Fit Barrier"); FitBarrier(barrier, t); } // [변경]
+            if (barrier != null) { Undo.RecordObject(barrier, "Fit Barrier"); FitBarrier(barrier, t); }
         }
     }
 
-    // [변경] 결계를 관목(누키, 4.4m) 아래 · 기둥 안쪽에 맞추고 바닥에 살짝 묻음 → 도리이 · 울퉁불퉁한 지형과 겹쳐 보이지 않게
+    // 결계를 관목(누키, 4.4m) 아래 · 기둥 안쪽에 맞추고 바닥에 살짝 묻음 → 도리이 · 울퉁불퉁한 지형과 겹쳐 보이지 않게
     static void FitBarrier(Transform barrier, ZoneTheme t)
     {
         const float bottom = -0.3f, top = 4.3f;
@@ -1043,7 +1043,53 @@ public static class ZoneGenerator
             Vector3 look = origin - go.transform.position;
             look.y = 0f;
             if (look.sqrMagnitude > 0.01f) go.transform.rotation = Quaternion.LookRotation(look.normalized, Vector3.up);
+
+            // 랜드마크 앞(공터 쪽)에 돌계단
+            if (t.landmarkStairs != null && t.landmarkStairs.Length > 0 && look.sqrMagnitude > 0.01f)
+            {
+                GameObject stairPrefab = Pick(t.landmarkStairs);
+                if (stairPrefab == null) continue;
+                Vector3 front = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (r - t.landmarkSize * 0.5f - t.stairSize * 0.4f);
+                GameObject stair = Spawn(stairPrefab, parent, terrain, front, t.stairSize, false, 0.15f, true);
+                stair.transform.rotation = Quaternion.LookRotation(look.normalized, Vector3.up) * Quaternion.Euler(0f, t.stairYaw, 0f);
+            }
         }
+        PlaceBridges(t, parent, terrain);
+    }
+
+    // 핵심: 북쪽 길 중간(굽은 길 위)에 길을 가로지르는 나무다리. 양 끝은 길가 언덕에 걸치고, 가운데는 길 위 bridgeClearance 이상
+    // 프리팹마다 긴 축(X/Z) · 피벗이 달라서 경계 상자로 방향 · 중심 · 바닥을 맞춤. 장식이라 콜라이더 뗌
+    static void PlaceBridges(ZoneTheme t, Transform parent, Terrain terrain)
+    {
+        if (!t.placeBridges || t.bridges == null || t.bridges.Length == 0 || !t.gateNorth) return; // [변경] 켜야 놓음
+        GameObject prefab = Pick(t.bridges);
+        if (prefab == null) return;
+
+        float span = t.terrainSize * 0.5f - t.wallRadius;
+        float d = t.wallRadius + span * 0.55f;
+        Vector3 center = Vector3.forward * d + Side(Vector3.forward) * Meander(t, d);
+        Vector3 ahead = Vector3.forward * (d + 1f) + Side(Vector3.forward) * Meander(t, d + 1f);
+        Vector3 tangent = (ahead - center).normalized;
+        Vector3 across = Side(tangent);
+
+        Bounds b = PrefabBounds(prefab);
+        bool longX = b.size.x >= b.size.z;
+        float scale = t.bridgeSpan / Mathf.Max(0.01f, longX ? b.size.x : b.size.z);
+        Quaternion rot = Quaternion.LookRotation(longX ? tangent : across, Vector3.up);
+
+        float half = t.bridgeSpan * 0.5f;
+        float endY = Mathf.Min(GroundY(terrain, origin + center + across * half), GroundY(terrain, origin + center - across * half));
+        float pathY = GroundY(terrain, origin + center);
+        float bottom = Mathf.Max(endY - 0.3f, pathY + t.bridgeClearance);
+
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+        go.transform.rotation = rot;
+        go.transform.localScale = Vector3.one * scale;
+        Vector3 offset = rot * (b.center * scale);
+        Vector3 pos = origin + center - new Vector3(offset.x, 0f, offset.z);
+        pos.y = bottom - b.min.y * scale;
+        go.transform.position = pos;
+        foreach (Collider c in go.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
     }
 
     static int PlacePathStones(ZoneTheme t, Transform parent, Terrain terrain)

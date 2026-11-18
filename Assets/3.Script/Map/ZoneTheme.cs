@@ -71,6 +71,13 @@ public class ZoneTheme : ScriptableObject
     public GameObject[] landmarks;
     public float landmarkSize = 9f;
     public float landmarkDistance = 6f; // 벽 반지름 바깥으로 이만큼
+    public GameObject[] landmarkStairs; // 랜드마크 앞(공터 쪽)에 놓는 돌계단
+    public float stairSize = 4f;
+    public float stairYaw = 0f;         // 계단 프리팹 방향이 다르면 90 · 180으로 돌림
+    public GameObject[] bridges;        // 북쪽 길 위를 가로지르는 나무다리 (구역마다 1개, 장식)
+    public bool placeBridges;           // [변경] 켜야 다리를 놓음
+    public float bridgeSpan = 20f;
+    public float bridgeClearance = 4f;  // 길 바닥에서 다리 아랫면까지 최소 높이
 
     [Header("Path")]
     public GameObject[] pathStones;
@@ -88,7 +95,7 @@ public class ZoneTheme : ScriptableObject
     public int groundParticleCount = 6;
     public GameObject[] overheadParticles;
 
-    // [변경] 실사 숲 디테일: 지형 풀(GPU 인스턴싱) · 비탈 절벽 바위 · 반사 프로브 (0 · 비움 = 끔)
+    // 실사 숲 디테일: 지형 풀(GPU 인스턴싱) · 비탈 절벽 바위 · 반사 프로브 (0 · 비움 = 끔)
     [Header("Forest Detail")]
     public GameObject[] detailGrass;   // 지형 디테일로 촘촘히 까는 풀 (Unity Terrain용 프리팹)
     public GameObject[] detailPlants;  // 벽 바깥에 듬성듬성 섞는 고사리 · 들풀
@@ -101,7 +108,7 @@ public class ZoneTheme : ScriptableObject
     [Header("Gate")]
     public Color gateColor = new Color(0.72f, 0.12f, 0.1f);
     public Color barrierColor = new Color(0.45f, 0.75f, 1f, 0.35f);
-    // [변경] 지정하면 상자 문 대신 기둥 · 관목 · 현판이 있는 도리이로 생성 (옻칠 · 검은 갓 · 받침돌)
+    // 지정하면 상자 문 대신 기둥 · 관목 · 현판이 있는 도리이로 생성 (옻칠 · 검은 갓 · 받침돌)
     public Material gateMaterial;
     public Material gateTrimMaterial;
     public Material gateBaseMaterial;

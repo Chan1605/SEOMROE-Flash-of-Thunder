@@ -124,6 +124,15 @@ MonoBehaviour:
   - {fileID: 5783182582912907754, guid: f6b349ccd8b35534584cc2c355581dec, type: 3}
   landmarkSize: 9
   landmarkDistance: 6
+  landmarkStairs:
+  - {fileID: 4092958400285463384, guid: ecfccf94968e80949b4ef519e5ac618e, type: 3}
+  - {fileID: 1390118301574091508, guid: 64a585a920a603e4b825010512b32d83, type: 3}
+  - {fileID: 3830399906593202171, guid: c17ce8b8e382b384a82fa7c450b8339b, type: 3}
+  stairSize: 4
+  stairYaw: 0
+  bridges: []
+  bridgeSpan: 20
+  bridgeClearance: 4
   pathStones:
   - {fileID: 941785190359463006, guid: 14a6eb4dc9ba8db4a9677c9351ca67a9, type: 3}
   - {fileID: 7786443865840404175, guid: ce237b62d7f6817438a1247bfa37b877, type: 3}

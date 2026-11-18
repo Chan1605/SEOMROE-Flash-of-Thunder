@@ -123,6 +123,12 @@ MonoBehaviour:
   landmarks: []
   landmarkSize: 9
   landmarkDistance: 6
+  landmarkStairs: []
+  stairSize: 4
+  stairYaw: 0
+  bridges: []
+  bridgeSpan: 20
+  bridgeClearance: 4
   pathStones:
   - {fileID: 941785190359463006, guid: 14a6eb4dc9ba8db4a9677c9351ca67a9, type: 3}
   - {fileID: 7786443865840404175, guid: ce237b62d7f6817438a1247bfa37b877, type: 3}
