@@ -381,7 +381,7 @@ public static class ForestPackSetup
         var set = Load();
         for (int i = from; i < to; i++)
         {
-            if (PrepareTheme(Zones[i].theme, set) == null) continue; // [변경] 교체를 다른 씬 메뉴와 공용으로
+            if (PrepareTheme(Zones[i].theme, set) == null) continue; // 교체를 다른 씬 메뉴와 공용으로
             EditorApplication.ExecuteMenuItem(Zones[i].menu); // 이 구역만 다시 생성 (웨이브 · 직접 배치한 오브젝트는 유지)
         }
         EnsureWind();
@@ -400,16 +400,30 @@ public static class ForestPackSetup
         theme.wallRockSpacing = 0.5f;
         theme.outerCoverCount = 220; // 언덕까지 덤불 · 고사리로 덮음
         theme.outerCoverReach = 24f;
-        if (set.pathStones.Length > 0) // 카툰 돌판 → 작은 실사 돌을 듬성듬성
+        if (set.pathStones.Length > 0) // 작은 돌 → 이끼 낀 돌길 조각 (밟는 길 느낌)
         {
             theme.pathStones = set.pathStones;
-            theme.pathStoneSize = 1.1f;
-            theme.pathStoneSpacing = 3.2f;
+            theme.pathStoneSize = 2.6f;
+            theme.pathStoneSpacing = 2.4f;
         }
         theme.innerRocks = set.innerRocks;
         theme.arenaCover = set.arenaCover; // 전투 공간 안: 낮은 풀 · 낙엽만 (시야 가림 없음)
         theme.outerCover = set.outerCover; // 벽 바깥: 고사리 · 덤불 · 어린 나무 · 버섯 · 가지
+        // 낙엽만 (Meadow Dust는 HDR 블룸에서 하얀 덩어리로 번져 뺌)
         if (set.leaves != null) theme.overheadParticles = new[] { set.leaves };
+
+        // 지형 풀 · 비탈 절벽 · 반사 프로브 · 도리이 · 정자
+        theme.detailGrass = set.detailGrass;
+        theme.detailPlants = set.detailPlants;
+        theme.detailDensity = 1f;
+        theme.detailDistance = 70f;
+        theme.slopeRocks = set.slopeRocks;
+        theme.slopeRockCount = 14;
+        theme.reflectionProbe = true;
+        theme.gateMaterial = set.lacquer;
+        theme.gateTrimMaterial = set.blackWood;
+        theme.gateBaseMaterial = set.stone;
+        if (theme.landmarks != null && theme.landmarks.Length > 0 && set.shrine != null) theme.landmarks = new[] { set.shrine };
         if (set.groundLayer != null) theme.groundLayer = set.groundLayer;
         if (set.arenaLayer != null) theme.arenaLayer = set.arenaLayer;
         if (set.roadLayer != null) theme.roadLayer = set.roadLayer;
@@ -418,7 +432,9 @@ public static class ForestPackSetup
     class PackSet
     {
         public GameObject[] trees, wallRocks, innerRocks, arenaCover, outerCover, pathStones;
-        public GameObject leaves;
+        public GameObject leaves, shrine;
+        public GameObject[] detailGrass, detailPlants, slopeRocks;
+        public Material lacquer, blackWood, stone;
         public TerrainLayer groundLayer, arenaLayer, roadLayer;
     }
 
@@ -431,7 +447,7 @@ public static class ForestPackSetup
             wallRocks = Concat(
                 Prefabs("Rocks/Prefabs/prefab_beech_forest_stones_01_{0}.prefab", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"),
                 Prefabs("Rocks/Prefabs Leaves/prefab_beech_forest_stones_01_{0}_Leaves.prefab", "2", "4", "6", "8", "10")), // 작은 돌(11~14)은 벽에서 빼고 돌길로
-            pathStones = Prefabs("Rocks/Prefabs/prefab_beech_forest_stones_01_{0}.prefab", "11", "12", "13", "14"),
+            pathStones = Prefabs("Stumps Roots and Branches/Prefabs Moss Cover/prefab_stone_road_0{0}_Moss.prefab", "1", "2", "3", "4", "5", "6"),
             innerRocks = Concat(
                 Prefabs("Rocks/Prefabs Leaves/prefab_beech_forest_stones_01_{0}_Leaves.prefab", "1", "3", "5", "7"),
                 Prefabs("Stumps Roots and Branches/Prefabs Moss Cover/prefab_{0}.prefab",
@@ -445,13 +461,184 @@ public static class ForestPackSetup
                 Prefabs("Beech Trees/Prefabs/prefab_beech_plant_{0}.prefab", "00", "01", "02"),
                 Prefabs("Foliage and Grass/Prefabs/prefab_{0}.prefab", "plant_01_1", "plant_02_1", "shaggy_soldier_01_1"),
                 Prefabs("Mushrooms/Prefabs/prefab_{0}.prefab", "Beech_mushroom_01", "Mushroom_Armillaria_01"),
-                Prefabs("Stumps Roots and Branches/Prefabs/prefab_beech_forest_branch_01_{0}.prefab", "1", "3")),
+                Prefabs("Stumps Roots and Branches/Prefabs/prefab_beech_forest_branch_01_{0}.prefab", "1", "3"),
+                // 쓰러진 통나무 · 마른 가지 · 버섯 더
+                Prefabs("Stumps Roots and Branches/Prefabs Leaves Cover/prefab_dead_log_0{0}_Leaves.prefab", "2", "4", "5"),
+                Prefabs("Stumps Roots and Branches/Prefabs/prefab_beech_dry_bough_0{0}.prefab", "1", "2"),
+                Prefabs("Mushrooms/Prefabs/prefab_{0}.prefab", "Beech_mushroom_02A", "Beech_mushroom_03A", "Mushroom_Lactarius_01", "Mushroom_Russula_01")),
+            detailGrass = Prefabs("Foliage and Grass/Unity Terrain Prefabs/prefab_Unity_Terrain_grass_{0}.prefab", "01_1", "01_2", "02_1", "02_2", "03_1", "03_2"),
+            detailPlants = Prefabs("Foliage and Grass/Unity Terrain Prefabs/prefab_Unity_Terrain_{0}.prefab",
+                "fern_01_1", "fern_01_3", "plant_01_1", "plant_02_1", "shaggy_soldier_01_1", "lily_valley_01_1"),
+            slopeRocks = Concat(
+                Prefabs("Stumps Roots and Branches/Prefabs Leaves Cover/prefab_beech_forest_scarp_0{0}_Leaves.prefab", "1", "2", "1_U", "2_U"),
+                Prefabs("Stumps Roots and Branches/Prefabs Moss Cover/prefab_sandy_slope _0{0}_Moss.prefab", "1", "3", "5")),
             leaves = AssetDatabase.LoadAssetAtPath<GameObject>(Root + "Particles/prefab_Leafs Forest.prefab"),
             groundLayer = Layer("Terrain_Layer5_Leaves", 0.3f), // 사본 · 광택 상한
             arenaLayer = Layer("Terrain_Layer2_Soil", 0.25f),
             roadLayer = Layer("Terrain_Layer3_Soil_Wet", 0.45f),
         };
+        BuildStructures(set);
         return set;
+    }
+
+    // ===== 구조물: 실사 도리이 재질 · 숲 정자 프리팹 (카툰 정자 대신) =====
+    const string StructureFolder = LookFolder + "/Structures";
+    const string WoodTex = Root + "Small Architecture/Bridge/Textures/T_wood_bridge_";
+    const string StoneTex = Root + "Rocks/Models/Textures/T_beech_forest_stones_01_";
+
+    static void BuildStructures(PackSet set)
+    {
+        if (!AssetDatabase.IsValidFolder(LookFolder)) AssetDatabase.CreateFolder(ZoneFolder.TrimEnd('/'), "Forest Look");
+        if (!AssetDatabase.IsValidFolder(StructureFolder)) AssetDatabase.CreateFolder(LookFolder, "Structures");
+        set.lacquer = WoodMaterial("Torii_Lacquer", new Color(0.66f, 0.16f, 0.08f), 0.38f, new Vector2(1f, 3f));
+        set.blackWood = WoodMaterial("Torii_Black", new Color(0.09f, 0.08f, 0.075f), 0.3f, new Vector2(3f, 1f));
+        // [변경] 팩 돌 재질(Top Cover 셰이더)은 기본 상자 메시에서 NaN 픽셀 → 블룸이 하얀 덩어리로 번짐. 팩 돌 질감으로 URP Lit 재질을 따로 만듦
+        set.stone = TexMaterial("Torii_Stone", new Color(0.85f, 0.85f, 0.82f), 0.25f, new Vector2(1f, 1f), StoneTex + "BC_SM.tga", StoneTex + "N.png");
+        Material roof = WoodMaterial("Shrine_Roof", new Color(0.2f, 0.17f, 0.15f), 0.2f, new Vector2(4f, 4f));
+        set.shrine = BuildShrine(set, roof);
+    }
+
+    // 다리 나무 질감에 색을 곱해 결이 보이는 옻칠 · 검은 나무
+    static Material WoodMaterial(string name, Color color, float smoothness, Vector2 tiling) =>
+        TexMaterial(name, color * 1.6f, smoothness, tiling, WoodTex + "BC.tga", WoodTex + "N.tga");
+
+    static Material TexMaterial(string name, Color color, float smoothness, Vector2 tiling, string basePath, string normalPath)
+    {
+        string path = $"{StructureFolder}/{name}.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null)
+        {
+            mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = name };
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        var baseTex = AssetDatabase.LoadAssetAtPath<Texture2D>(basePath);
+        var normal = AssetDatabase.LoadAssetAtPath<Texture2D>(normalPath);
+        color.a = 1f;
+        mat.SetColor("_BaseColor", color);
+        if (baseTex != null) { mat.SetTexture("_BaseMap", baseTex); mat.SetTextureScale("_BaseMap", tiling); }
+        if (normal != null)
+        {
+            mat.SetTexture("_BumpMap", normal);
+            mat.SetTextureScale("_BumpMap", tiling);
+            mat.EnableKeyword("_NORMALMAP");
+        }
+        mat.SetFloat("_Smoothness", smoothness);
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    // 핵심: 돌 기단(땅에 2m 묻힘) · 옻칠 기둥 4 · 테두리 들보 · 제단 · 우진각 지붕(메시) · 용마루
+    static GameObject BuildShrine(PackSet set, Material roof)
+    {
+        Material red = set.lacquer, black = set.blackWood, stone = set.stone != null ? set.stone : black;
+        var root = new GameObject("Forest_Shrine");
+        Box(root.transform, "Platform", new Vector3(0f, -0.75f, 0f), new Vector3(5.8f, 2.5f, 5.8f), stone, true);
+        Box(root.transform, "Step", new Vector3(0f, 0.15f, -3.35f), new Vector3(2f, 0.3f, 0.9f), stone, true);
+        foreach (float sx in new[] { -1f, 1f })
+        foreach (float sz in new[] { -1f, 1f })
+            Cylinder(root.transform, "Post", new Vector3(sx * 2.3f, 2f, sz * 2.3f), new Vector3(0.34f, 1.5f, 0.34f), red, true);
+        Box(root.transform, "Beam_F", new Vector3(0f, 3.45f, -2.3f), new Vector3(5f, 0.28f, 0.28f), red, false);
+        Box(root.transform, "Beam_B", new Vector3(0f, 3.45f, 2.3f), new Vector3(5f, 0.28f, 0.28f), red, false);
+        Box(root.transform, "Beam_L", new Vector3(-2.3f, 3.45f, 0f), new Vector3(0.28f, 0.28f, 5f), red, false);
+        Box(root.transform, "Beam_R", new Vector3(2.3f, 3.45f, 0f), new Vector3(0.28f, 0.28f, 5f), red, false);
+        Box(root.transform, "Altar", new Vector3(0f, 1f, 1.2f), new Vector3(1.4f, 1f, 0.9f), black, true);
+        Box(root.transform, "Altar_Top", new Vector3(0f, 1.55f, 1.2f), new Vector3(1.6f, 0.1f, 1.1f), red, false);
+
+        var roofGo = new GameObject("Roof");
+        roofGo.transform.SetParent(root.transform, false);
+        roofGo.AddComponent<MeshFilter>().sharedMesh = RoofMesh();
+        roofGo.AddComponent<MeshRenderer>().sharedMaterial = roof;
+        Box(root.transform, "Ridge", new Vector3(0f, 5.42f, 0f), new Vector3(1.8f, 0.22f, 0.3f), black, false);
+
+        string path = $"{StructureFolder}/Forest_Shrine.prefab";
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
+        Object.DestroyImmediate(root);
+        return prefab;
+    }
+
+    // 처마(한 변 7.6m, 높이 3.6m) → 용마루(길이 1.6m, 높이 5.3m). 아래에서도 보이게 양면
+    static Mesh RoofMesh()
+    {
+        string path = $"{StructureFolder}/Forest_Shrine_Roof.asset";
+        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        if (mesh == null)
+        {
+            mesh = new Mesh { name = "Forest_Shrine_Roof" };
+            AssetDatabase.CreateAsset(mesh, path);
+        }
+        const float e = 3.8f, eaveY = 3.6f, ridgeX = 0.8f, ridgeY = 5.3f;
+        Vector3 a = new Vector3(-e, eaveY, -e), b = new Vector3(e, eaveY, -e), c = new Vector3(e, eaveY, e), d = new Vector3(-e, eaveY, e);
+        Vector3 r0 = new Vector3(-ridgeX, ridgeY, 0f), r1 = new Vector3(ridgeX, ridgeY, 0f);
+        var faces = new List<Vector3[]>
+        {
+            new[] { a, r0, r1, b }, // 앞
+            new[] { c, r1, r0, d }, // 뒤
+            new[] { d, r0, a },     // 왼쪽
+            new[] { b, r1, c },     // 오른쪽
+        };
+        var verts = new List<Vector3>();
+        var uvs = new List<Vector2>();
+        var tris = new List<int>();
+        foreach (bool back in new[] { false, true })
+        foreach (Vector3[] f in faces)
+        {
+            int start = verts.Count;
+            foreach (Vector3 v in f)
+            {
+                verts.Add(v);
+                uvs.Add(new Vector2(v.x * 0.25f, (v.z + v.y) * 0.25f));
+            }
+            for (int i = 1; i < f.Length - 1; i++)
+            {
+                if (!back) { tris.Add(start); tris.Add(start + i); tris.Add(start + i + 1); }
+                else { tris.Add(start); tris.Add(start + i + 1); tris.Add(start + i); }
+            }
+        }
+        mesh.Clear();
+        mesh.SetVertices(verts);
+        mesh.SetUVs(0, uvs);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateTangents();
+        mesh.RecalculateBounds();
+        EditorUtility.SetDirty(mesh);
+        return mesh;
+    }
+
+    static GameObject Box(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat, bool collider) =>
+        Primitive(PrimitiveType.Cube, parent, name, pos, scale, mat, collider);
+
+    static GameObject Cylinder(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat, bool collider) =>
+        Primitive(PrimitiveType.Cylinder, parent, name, pos, scale, mat, collider);
+
+    static GameObject Primitive(PrimitiveType type, Transform parent, string name, Vector3 pos, Vector3 scale, Material mat, bool collider)
+    {
+        GameObject go = GameObject.CreatePrimitive(type);
+        go.name = name;
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = pos;
+        go.transform.localScale = scale;
+        go.GetComponent<Renderer>().sharedMaterial = mat;
+        if (!collider) Object.DestroyImmediate(go.GetComponent<Collider>());
+        return go;
+    }
+
+    // 그래픽 품질 (목표 90fps 이상): 그림자 거리 40 → 60 · 캐스케이드 2 → 3. 직접 바꾼 값이 있으면 그대로 둠
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/Quality (90fps)")]
+    static void Quality()
+    {
+        var asset = AssetDatabase.LoadMainAssetAtPath("Assets/2.Model/PIpeLine/Settings/PC_RPAsset.asset");
+        if (asset == null) { Debug.LogWarning("[ForestPack] PC_RPAsset 없음"); return; }
+        var so = new SerializedObject(asset);
+        int n = 0;
+        SerializedProperty distance = so.FindProperty("m_ShadowDistance");
+        if (distance != null && distance.floatValue <= 40f) { distance.floatValue = 60f; n++; }
+        SerializedProperty cascades = so.FindProperty("m_ShadowCascadeCount");
+        if (cascades != null && cascades.intValue < 3) { cascades.intValue = 3; n++; }
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(asset);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[ForestPack] 그래픽 품질 · 바꾼 항목 {n}개 (그림자 거리 60 · 캐스케이드 3)");
     }
 
     static GameObject[] Prefabs(string pattern, params string[] ids)

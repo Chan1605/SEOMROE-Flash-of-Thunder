@@ -292,7 +292,8 @@ public static class ZoneGenerator
         (GameObject entrance, GameObject exit) = BuildGates(theme, generated.transform, terrain);
         Transform respawn = BuildRespawnPoint(theme, generated.transform, terrain);
 
-        int wallRocks = PlaceWallRocks(theme, Group(generated, "WallRocks"), terrain);
+        Transform wallGroup = Group(generated, "WallRocks");
+        int wallRocks = PlaceWallRocks(theme, wallGroup, terrain) + PlaceSlopeRocks(theme, wallGroup, terrain); // 비탈 절벽 바위
         Transform innerGroup = Group(generated, "InnerRocks");
         int innerRocks = PlaceInnerRocks(theme, innerGroup, terrain) + PlacePathEdge(theme, innerGroup, terrain); // 길가 바위 · 고사리
         int trees = PlaceTrees(theme, Group(generated, "Trees"), terrain);
@@ -300,6 +301,7 @@ public static class ZoneGenerator
         int stones = PlacePathStones(theme, Group(generated, "PathStones"), terrain);
         PlaceLandmarks(theme, Group(generated, "Landmarks"), terrain);
         PlaceParticles(theme, Group(generated, "Particles"), terrain);
+        EnsureProbe(theme, generated.transform);
         if (applyAtmosphere) ApplyAtmosphere(theme);
 
         ZoneArena arena = root.GetComponent<ZoneArena>();
@@ -338,18 +340,23 @@ public static class ZoneGenerator
 
         Undo.RegisterCompleteObjectUndo(terrain.terrainData, "Repaint Zone");
         WriteHeights(theme, terrain.terrainData); // 골짜기 · 비탈 등 높이도 다시 (공터 · 길 중심 높이는 그대로 0)
-        terrain.heightmapPixelError = 1f; // [변경] 먼 곳 LOD로 이웃 지형과 어긋나 틈이 보이지 않게
         PaintLayers(theme, terrain.terrainData);
+        PaintDetails(theme, terrain.terrainData);
+        ConfigureTerrain(terrain, theme);
         RebuildInvisibleWall(theme, generated);
+        RestyleGates(theme, generated); // 결계는 그대로 두고 문 모양만 새로
         EditorUtility.SetDirty(terrain.terrainData);
 
-        int wallRocks = PlaceWallRocks(theme, Regroup(generated, "WallRocks"), terrain);
+        Transform wallGroup = Regroup(generated, "WallRocks");
+        int wallRocks = PlaceWallRocks(theme, wallGroup, terrain) + PlaceSlopeRocks(theme, wallGroup, terrain);
         Transform innerGroup = Regroup(generated, "InnerRocks");
         int innerRocks = PlaceInnerRocks(theme, innerGroup, terrain) + PlacePathEdge(theme, innerGroup, terrain);
         int trees = PlaceTrees(theme, Regroup(generated, "Trees"), terrain);
         int cover = PlaceCover(theme, Regroup(generated, "Cover"), terrain);
         int stones = PlacePathStones(theme, Regroup(generated, "PathStones"), terrain);
+        PlaceLandmarks(theme, Regroup(generated, "Landmarks"), terrain); // 카툰 정자 → 테마 랜드마크
         PlaceParticles(theme, Regroup(generated, "Particles"), terrain);
+        EnsureProbe(theme, generated);
 
         EditorSceneManager.MarkSceneDirty(root.scene);
         Debug.Log($"[ZoneGenerator] {theme.zoneName} 소품만 다시 생성 · 벽 바위 {wallRocks}, 안쪽 바위 {innerRocks}, 나무 {trees}, 풀·덤불 {cover}, 돌길 {stones}");
@@ -416,7 +423,7 @@ public static class ZoneGenerator
         if (k > 0f) fade *= Mathf.Lerp(1f, 0.6f + 0.8f * Mathf.PerlinNoise(x * 0.05f + t.seed * 8.3f, z * 0.05f + t.seed * 3.9f), k);
         h = Cut(t, x, z, h, fade);
 
-        // [변경] 핵심: 이음매는 길 · 골짜기까지 다 깎은 뒤 마지막에 맞춤. 노이즈 없는 같은 규칙으로 깎은 높이로 모아야
+        // 핵심: 이음매는 길 · 골짜기까지 다 깎은 뒤 마지막에 맞춤. 노이즈 없는 같은 규칙으로 깎은 높이로 모아야
         // 이웃 구역(시드 · 로컬 좌표가 다름)과 경계가 정확히 같아져 틈이 안 생김
         float toEdge = t.terrainSize * 0.5f - Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
         float seam = Cut(t, x, z, SeamHeight, plainFade);
@@ -467,12 +474,13 @@ public static class ZoneGenerator
 
         WriteHeights(t, data); // 소품만 다시 만들 때도 쓰도록 분리
         PaintLayers(t, data);
+        PaintDetails(t, data);
         float half = t.terrainSize * 0.5f;
         EditorUtility.SetDirty(data);
         AssetDatabase.SaveAssets();
 
         GameObject go = Terrain.CreateTerrainGameObject(data);
-        go.GetComponent<Terrain>().heightmapPixelError = 1f; // [변경] 먼 곳 LOD로 이웃 지형과 어긋나 틈이 보이지 않게 (기본 5)
+        ConfigureTerrain(go.GetComponent<Terrain>(), t);
         go.name = "Terrain";
         go.transform.SetParent(parent, false);
         go.transform.position = origin + new Vector3(-half, 0f, -half);
@@ -662,12 +670,17 @@ public static class ZoneGenerator
         gate.transform.localRotation = Quaternion.LookRotation(dir, Vector3.up); // 동서 문은 옆으로 돌림
 
         float w = t.gateHalfWidth;
-        Part(gate.transform, "Pillar_L", new Vector3(-(w + 0.4f), 2.75f, 0f), new Vector3(0.5f, 5.5f, 0.5f), gateMat, true);
-        Part(gate.transform, "Pillar_R", new Vector3(w + 0.4f, 2.75f, 0f), new Vector3(0.5f, 5.5f, 0.5f), gateMat, true);
-        Part(gate.transform, "Beam_Top", new Vector3(0f, 5.7f, 0f), new Vector3(w * 2f + 2.4f, 0.45f, 0.7f), gateMat, false);
-        Part(gate.transform, "Beam_Low", new Vector3(0f, 4.9f, 0f), new Vector3(w * 2f + 0.9f, 0.3f, 0.45f), gateMat, false);
+        if (t.gateMaterial != null) BuildTorii(gate.transform, t);
+        else
+        {
+            Part(gate.transform, "Pillar_L", new Vector3(-(w + 0.4f), 2.75f, 0f), new Vector3(0.5f, 5.5f, 0.5f), gateMat, true);
+            Part(gate.transform, "Pillar_R", new Vector3(w + 0.4f, 2.75f, 0f), new Vector3(0.5f, 5.5f, 0.5f), gateMat, true);
+            Part(gate.transform, "Beam_Top", new Vector3(0f, 5.7f, 0f), new Vector3(w * 2f + 2.4f, 0.45f, 0.7f), gateMat, false);
+            Part(gate.transform, "Beam_Low", new Vector3(0f, 4.9f, 0f), new Vector3(w * 2f + 0.9f, 0.3f, 0.45f), gateMat, false);
+        }
 
         GameObject barrier = Part(gate.transform, "Barrier", new Vector3(0f, 2.5f, 0f), new Vector3(w * 2f, 5f, 0.3f), barrierMat, true);
+        if (t.gateMaterial != null) FitBarrier(barrier.transform, t); // [변경] 도리이 관목 아래로
         barrier.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
         return barrier;
     }
@@ -734,6 +747,175 @@ public static class ZoneGenerator
             count++;
         }
         return count;
+    }
+
+    // 명신 도리이: 받침돌 위 둥근 기둥 2 · 관목(누키) · 현판 · 시마키 · 끝이 들린 검은 갓(가사기)
+    static void BuildTorii(Transform gate, ZoneTheme t)
+    {
+        Material red = t.gateMaterial;
+        Material black = t.gateTrimMaterial != null ? t.gateTrimMaterial : red;
+        Material stone = t.gateBaseMaterial != null ? t.gateBaseMaterial : black;
+        float x = t.gateHalfWidth + 0.5f;
+        foreach (float s in new[] { -1f, 1f })
+        {
+            Prim(gate, s < 0f ? "Pillar_L" : "Pillar_R", PrimitiveType.Cylinder, new Vector3(s * x, 2.85f, 0f), new Vector3(0.62f, 2.85f, 0.62f), 0f, red, true);
+            Prim(gate, "Kamebara", PrimitiveType.Cylinder, new Vector3(s * x, 0.3f, 0f), new Vector3(0.92f, 0.3f, 0.92f), 0f, black, false);
+            Prim(gate, "BaseStone", PrimitiveType.Cube, new Vector3(s * x, -0.2f, 0f), new Vector3(1.4f, 0.6f, 1.4f), 0f, stone, false);
+            Prim(gate, "Daiwa", PrimitiveType.Cylinder, new Vector3(s * x, 5.42f, 0f), new Vector3(0.74f, 0.06f, 0.74f), 0f, black, false);
+        }
+        Prim(gate, "Nuki", PrimitiveType.Cube, new Vector3(0f, 4.55f, 0f), new Vector3(x * 2f + 1.7f, 0.34f, 0.26f), 0f, red, false);
+        Prim(gate, "Plaque", PrimitiveType.Cube, new Vector3(0f, 5.05f, 0f), new Vector3(0.85f, 1.05f, 0.3f), 0f, black, false);
+        Prim(gate, "Shimaki", PrimitiveType.Cube, new Vector3(0f, 5.66f, 0f), new Vector3(x * 2f + 2.5f, 0.34f, 0.5f), 0f, red, false);
+        float half = x + 1.55f;
+        Prim(gate, "Kasagi", PrimitiveType.Cube, new Vector3(0f, 6.05f, 0f), new Vector3(half * 2f, 0.44f, 0.64f), 0f, black, false);
+        foreach (float s in new[] { -1f, 1f })
+            Prim(gate, "Kasagi_End", PrimitiveType.Cube, new Vector3(s * (half + 0.62f), 6.16f, 0f), new Vector3(1.4f, 0.42f, 0.62f), s * 9f, black, false);
+    }
+
+    static GameObject Prim(Transform parent, string name, PrimitiveType type, Vector3 localPos, Vector3 scale, float roll, Material mat, bool keepCollider)
+    {
+        GameObject go = GameObject.CreatePrimitive(type);
+        go.name = name;
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = localPos;
+        go.transform.localRotation = Quaternion.Euler(0f, 0f, roll);
+        go.transform.localScale = scale;
+        go.GetComponent<Renderer>().sharedMaterial = mat;
+        if (!keepCollider) Object.DestroyImmediate(go.GetComponent<Collider>());
+        return go;
+    }
+
+    // 다른 씬(결계가 진행기 · 포탈에 연결됨)용: 문 오브젝트 · 결계는 그대로, 모양 부품만 새로
+    static void RestyleGates(ZoneTheme t, Transform generated)
+    {
+        if (t.gateMaterial == null) return;
+        foreach (Transform gate in generated)
+        {
+            if (!gate.name.StartsWith("Gate_")) continue;
+            for (int i = gate.childCount - 1; i >= 0; i--)
+                if (gate.GetChild(i).name != "Barrier") Undo.DestroyObjectImmediate(gate.GetChild(i).gameObject);
+            BuildTorii(gate, t);
+            Transform barrier = gate.Find("Barrier");
+            if (barrier != null) { Undo.RecordObject(barrier, "Fit Barrier"); FitBarrier(barrier, t); } // [변경]
+        }
+    }
+
+    // [변경] 결계를 관목(누키, 4.4m) 아래 · 기둥 안쪽에 맞추고 바닥에 살짝 묻음 → 도리이 · 울퉁불퉁한 지형과 겹쳐 보이지 않게
+    static void FitBarrier(Transform barrier, ZoneTheme t)
+    {
+        const float bottom = -0.3f, top = 4.3f;
+        barrier.localPosition = new Vector3(0f, (bottom + top) * 0.5f, 0f);
+        barrier.localScale = new Vector3((t.gateHalfWidth + 0.15f) * 2f, top - bottom, 0.3f);
+    }
+
+    // 지형 그리기 설정: 먼 곳 LOD로 이웃 지형과 어긋나 틈이 보이지 않게 + 디테일(풀) 보이는 거리
+    static void ConfigureTerrain(Terrain terrain, ZoneTheme t)
+    {
+        terrain.heightmapPixelError = 1f;
+        terrain.detailObjectDistance = t.detailDistance;
+        terrain.detailObjectDensity = 1f;
+    }
+
+    // 핵심: 지형 디테일 풀. 공터 가운데 · 길 · 가파른 곳은 비우고, 공터 가장자리부터 바깥으로 무리 지어 깔림
+    // 칸(약 0.9m)마다 0~3포기 · GPU 인스턴싱 → 프리팹 수백 개보다 훨씬 가볍게 수만 포기
+    static void PaintDetails(ZoneTheme t, TerrainData data)
+    {
+        var protos = new List<GameObject>();
+        if (t.detailDensity > 0f && t.detailGrass != null) protos.AddRange(t.detailGrass.Where(p => p != null));
+        int grassCount = protos.Count;
+        if (t.detailDensity > 0f && t.detailPlants != null) protos.AddRange(t.detailPlants.Where(p => p != null));
+
+        const int res = 128;
+        data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
+        data.SetDetailResolution(res, 16);
+        data.detailPrototypes = protos.Select(p => new DetailPrototype
+        {
+            prototype = p,
+            usePrototypeMesh = true,
+            useInstancing = true,
+            renderMode = DetailRenderMode.VertexLit,
+            minWidth = 0.8f, maxWidth = 1.3f,
+            minHeight = 0.75f, maxHeight = 1.3f,
+            noiseSpread = 0.4f,
+            healthyColor = Color.white,
+            dryColor = new Color(0.85f, 0.8f, 0.68f),
+        }).ToArray();
+        if (protos.Count == 0) return;
+
+        var random = new System.Random(t.seed * 31 + 7); // 다른 배치 순서에 영향 없게 따로
+        var layers = new int[protos.Count][,];
+        for (int i = 0; i < layers.Length; i++) layers[i] = new int[res, res];
+        float half = t.terrainSize * 0.5f;
+        for (int iz = 0; iz < res; iz++)
+        for (int ix = 0; ix < res; ix++)
+        {
+            float x = (ix + 0.5f) / res * t.terrainSize - half;
+            float z = (iz + 0.5f) / res * t.terrainSize - half;
+            float r = Mathf.Sqrt(x * x + z * z);
+            float edge = Mathf.Clamp01((r - (t.combatRadius - 2f)) / 4f);
+            float road = GateStrip(t, x, z, t.gateHalfWidth - 0.5f, 1.5f);
+            float steep = data.GetSteepness((ix + 0.5f) / res, (iz + 0.5f) / res);
+            float flatK = 1f - Mathf.Clamp01((steep - 32f) / 10f);
+            float patch = Mathf.PerlinNoise(x * 0.11f + t.seed * 1.3f, z * 0.11f + t.seed * 2.7f);
+            float w = edge * (1f - road) * flatK * Mathf.Clamp01(patch * 1.7f - 0.25f) * t.detailDensity;
+            if (w <= 0.02f) continue;
+
+            if (grassCount > 0)
+            {
+                float pick = Mathf.PerlinNoise(x * 0.05f + t.seed * 4.1f, z * 0.05f + t.seed * 0.7f);
+                int gi = Mathf.Min(grassCount - 1, (int)(pick * grassCount));
+                layers[gi][iz, ix] = Mathf.Clamp(Mathf.RoundToInt(w * 3f + (float)random.NextDouble() * 0.6f - 0.3f), 0, 3);
+            }
+            if (protos.Count > grassCount && r > t.wallRadius - 1f && random.NextDouble() < w * 0.35f)
+                layers[grassCount + random.Next(protos.Count - grassCount)][iz, ix] = 1;
+        }
+        for (int i = 0; i < layers.Length; i++) data.SetDetailLayer(0, 0, i, layers[i]);
+    }
+
+    // 가파른 비탈(26° 이상)에 흙벽 · 절벽 바위를 박아 매끈한 비탈을 가림. 비탈 아래쪽을 바라보게
+    static int PlaceSlopeRocks(ZoneTheme t, Transform parent, Terrain terrain)
+    {
+        if (t.slopeRockCount <= 0 || !HasAny(t.slopeRocks, "Slope Rocks")) return 0;
+        TerrainData d = terrain.terrainData;
+        Vector3 tp = terrain.transform.position;
+        float half = t.terrainSize * 0.5f - 6f;
+        int count = 0;
+        for (int attempt = 0; attempt < t.slopeRockCount * 60 && count < t.slopeRockCount; attempt++)
+        {
+            Vector3 pos = new Vector3(RangeF(-half, half), 0f, RangeF(-half, half));
+            if (new Vector2(pos.x, pos.z).magnitude < t.wallRadius + 3f || InGate(t, pos, 4f)) continue;
+            float nx = (origin.x + pos.x - tp.x) / d.size.x, nz = (origin.z + pos.z - tp.z) / d.size.z;
+            if (d.GetSteepness(nx, nz) < 26f) continue;
+
+            GameObject go = Spawn(Pick(t.slopeRocks), parent, terrain, pos, 0f, false, 0.4f, true);
+            go.transform.localScale *= RangeF(0.8f, 1.3f);
+            Vector3 n = d.GetInterpolatedNormal(nx, nz);
+            n.y = 0f;
+            if (n.sqrMagnitude > 0.001f) go.transform.rotation = Quaternion.LookRotation(n.normalized, Vector3.up) * Quaternion.Euler(0f, RangeF(-25f, 25f), 0f);
+            count++;
+        }
+        return count;
+    }
+
+    // 구역마다 실시간 반사 프로브 1개 (시작할 때 한 번만 굽힘) → 바위 · 잎 · 칠한 나무가 덜 납작해 보임
+    static void EnsureProbe(ZoneTheme t, Transform generated)
+    {
+        Transform old = generated.Find("ReflectionProbe");
+        if (old != null) Undo.DestroyObjectImmediate(old.gameObject);
+        if (!t.reflectionProbe) return;
+
+        var go = new GameObject("ReflectionProbe");
+        go.transform.SetParent(generated, false);
+        go.transform.position = origin + Vector3.up * 6f;
+        var probe = go.AddComponent<ReflectionProbe>();
+        probe.mode = ReflectionProbeMode.Realtime;
+        probe.refreshMode = ReflectionProbeRefreshMode.OnAwake;
+        probe.timeSlicingMode = ReflectionProbeTimeSlicingMode.IndividualFaces;
+        probe.resolution = 128;
+        probe.size = new Vector3(t.terrainSize, 40f, t.terrainSize);
+        probe.farClipPlane = 150f;
+        probe.hdr = true;
+        Undo.RegisterCreatedObjectUndo(go, "Reflection Probe");
     }
 
     // 길가를 따라 불규칙한 간격으로 작은 바위 · 고사리 (곧은 둑 대신 숲길 가장자리처럼)

@@ -33,8 +33,8 @@ public class ZoneTheme : ScriptableObject
     public float hillRoughness = 0f;
     public float pathMeander = 0f;
     public float corridorFade = 6f; // 길 양옆 비탈 폭 (클수록 완만 · 길가는 투명 벽이 막음)
-    public float valleyWidth = 0f;  // [변경] 길 양옆 이 폭 안의 언덕을 낮춰 협곡 대신 완만한 골짜기로 (0 = 끔)
-    public TerrainLayer slopeLayer; // [변경] 가파른 비탈에 칠할 질감 (돌 등) · 늘어진 낙엽 질감을 가림
+    public float valleyWidth = 0f;  // 길 양옆 이 폭 안의 언덕을 낮춰 협곡 대신 완만한 골짜기로 (0 = 끔)
+    public TerrainLayer slopeLayer; // 가파른 비탈에 칠할 질감 (돌 등) · 늘어진 낙엽 질감을 가림
     public TerrainLayer groundLayer;
     public TerrainLayer arenaLayer;
     public TerrainLayer roadLayer;
@@ -88,7 +88,21 @@ public class ZoneTheme : ScriptableObject
     public int groundParticleCount = 6;
     public GameObject[] overheadParticles;
 
+    // [변경] 실사 숲 디테일: 지형 풀(GPU 인스턴싱) · 비탈 절벽 바위 · 반사 프로브 (0 · 비움 = 끔)
+    [Header("Forest Detail")]
+    public GameObject[] detailGrass;   // 지형 디테일로 촘촘히 까는 풀 (Unity Terrain용 프리팹)
+    public GameObject[] detailPlants;  // 벽 바깥에 듬성듬성 섞는 고사리 · 들풀
+    public float detailDensity = 0f;
+    public float detailDistance = 60f;
+    public GameObject[] slopeRocks;    // 가파른 비탈에 박는 흙벽 · 절벽 바위
+    public int slopeRockCount = 0;
+    public bool reflectionProbe;
+
     [Header("Gate")]
     public Color gateColor = new Color(0.72f, 0.12f, 0.1f);
     public Color barrierColor = new Color(0.45f, 0.75f, 1f, 0.35f);
+    // [변경] 지정하면 상자 문 대신 기둥 · 관목 · 현판이 있는 도리이로 생성 (옻칠 · 검은 갓 · 받침돌)
+    public Material gateMaterial;
+    public Material gateTrimMaterial;
+    public Material gateBaseMaterial;
 }

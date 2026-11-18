@@ -109,18 +109,29 @@ MonoBehaviour:
   - {fileID: 5272635928067016085, guid: eec61d2e117ee7045b808df231c61985, type: 3}
   - {fileID: 5234629434988832831, guid: c18aea47e150a5f418d3bc2bff658d28, type: 3}
   - {fileID: 8883877138817436546, guid: 50a0b309b74f45e498d38c4a879588aa, type: 3}
+  - {fileID: 3042441252523224104, guid: 9fde17705c7d87a46b07b8be7568a25c, type: 3}
+  - {fileID: 8265448719823249627, guid: 7541e6bf3153ea847a65ca3730d8e3a5, type: 3}
+  - {fileID: 7327753942129680265, guid: a1a10f93fdc47bd42b1bd4ae009be546, type: 3}
+  - {fileID: 3949394663649588229, guid: f020b27eb509fe145a33136b891e0bb8, type: 3}
+  - {fileID: 913324945025446953, guid: efcd1ad5fa8af4b469a0a5113b4b665c, type: 3}
+  - {fileID: 4527557193210986240, guid: 6ed0399e12873de489b2265928f57c60, type: 3}
+  - {fileID: 2341899023416037385, guid: cac437221e0551d438ead219d6fc1d5d, type: 3}
+  - {fileID: 3979517459710083468, guid: cd965ac31d93e6940be0386880dd9116, type: 3}
+  - {fileID: 464410871076248215, guid: ceb844af5bf1bd3408d1e1b8747ad709, type: 3}
   outerCoverCount: 220
   outerCoverReach: 24
   landmarks: []
   landmarkSize: 9
   landmarkDistance: 6
   pathStones:
-  - {fileID: 9137900202239688950, guid: 961157c2191626e409398083c47bf033, type: 3}
-  - {fileID: 3783054325739327014, guid: 7b4b23d69b2c6e149a6e6c6a6c4fd731, type: 3}
-  - {fileID: 5971110055264604586, guid: f76ec252d4d58fb40a029fe9b5f7f61a, type: 3}
-  - {fileID: 7566276046555049618, guid: b2e75757887dfab449c921a7a25078b1, type: 3}
-  pathStoneSize: 1.1
-  pathStoneSpacing: 3.2
+  - {fileID: 941785190359463006, guid: 14a6eb4dc9ba8db4a9677c9351ca67a9, type: 3}
+  - {fileID: 7786443865840404175, guid: ce237b62d7f6817438a1247bfa37b877, type: 3}
+  - {fileID: 3057352852615124494, guid: e04230ebc6319c441938fe622b26dccc, type: 3}
+  - {fileID: 8525558660027328774, guid: 3d334cdd6b63c2d458fe5ae0d04ff9c6, type: 3}
+  - {fileID: 5641905791085168607, guid: a57e48122adef9947bfe9264e4babe12, type: 3}
+  - {fileID: 6982743853160910242, guid: a59498955298fd8499193f8ddb707ed3, type: 3}
+  pathStoneSize: 2.6
+  pathStoneSpacing: 2.4
   skybox: {fileID: 2100000, guid: 5bd7c6362bf6d4842a395ead1516ef69, type: 2}
   fog: 1
   fogColor: {r: 0.56, g: 0.62, b: 0.6, a: 1}
@@ -132,5 +143,34 @@ MonoBehaviour:
   groundParticleCount: 6
   overheadParticles:
   - {fileID: 1017164405197158, guid: ed2faaec6760efe47bb8c4ca3dab6e9d, type: 3}
+  detailGrass:
+  - {fileID: 3929650344775280591, guid: 14f2766e188cc23459aaad2fc444b4e3, type: 3}
+  - {fileID: 6610836305396197052, guid: c4e5bdaeb0e4b2142bd3a78eae2917e3, type: 3}
+  - {fileID: 5001871497718003202, guid: 402a9e8eaf27e4342a011bb301b9cf9b, type: 3}
+  - {fileID: 7904806139297608414, guid: af27e409255bbcf4ab0389af5018b247, type: 3}
+  - {fileID: 4392666999026414498, guid: 29ea85cd8eb7dc24e98456eddc59cd0a, type: 3}
+  - {fileID: 4764276725066806957, guid: abaf3caecfa712c4d802198aa6a28f1d, type: 3}
+  detailPlants:
+  - {fileID: 8393467089908909337, guid: 5c60724a86a0aef40a0bfd26574a8f41, type: 3}
+  - {fileID: 7923536399698452489, guid: f8d3cf5911b20fe4f8b0c44abd7acade, type: 3}
+  - {fileID: 7243209615218423865, guid: d8405de406895ec4c817f3f3255f9521, type: 3}
+  - {fileID: 8658205388212818215, guid: badee0537a88af943baf7f6c9498d26e, type: 3}
+  - {fileID: 436777448057077585, guid: 215e61369e3c09e4faac4cecc0892e13, type: 3}
+  - {fileID: 392714924975134322, guid: 3bab133fe9078c24ab55439ad12a8a14, type: 3}
+  detailDensity: 1
+  detailDistance: 70
+  slopeRocks:
+  - {fileID: 4504017761037396265, guid: 1b06da76d47af714987fe5d9c8cccd2d, type: 3}
+  - {fileID: 4959725215719201400, guid: e78ec7c522d90f140a1d3fe6880baa1b, type: 3}
+  - {fileID: 2905298516822638136, guid: 602acd00d7e91464fb89ea42cf419e24, type: 3}
+  - {fileID: 836082558680198667, guid: da89ed28c9fffb34abe3a356881a20e6, type: 3}
+  - {fileID: 5119439453966723518, guid: ebe214359daf176438bf11eb6cecee80, type: 3}
+  - {fileID: 2745197921328881229, guid: 767bc7afbde6729419e7cd54156f6fb9, type: 3}
+  - {fileID: 905553770389063046, guid: 927919c8b4b9ac845b89c0d280ffdc92, type: 3}
+  slopeRockCount: 14
+  reflectionProbe: 1
   gateColor: {r: 0.72, g: 0.12, b: 0.1, a: 1}
   barrierColor: {r: 0.45, g: 0.75, b: 1, a: 0.35}
+  gateMaterial: {fileID: 2100000, guid: 5c112baaca4454e4d88d9f4cfcf08c03, type: 2}
+  gateTrimMaterial: {fileID: 2100000, guid: 1ed7998a193c26e459a799e0d62888ca, type: 2}
+  gateBaseMaterial: {fileID: 2100000, guid: 77000f1dc854d29408d5c9deeec24f80, type: 2}
