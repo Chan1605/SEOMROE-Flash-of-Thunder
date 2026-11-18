@@ -33,6 +33,8 @@ MonoBehaviour:
   hillRoughness: 1
   pathMeander: 7
   corridorFade: 11
+  valleyWidth: 26
+  slopeLayer: {fileID: 8574412962073106934, guid: 380990e4011ae7f468c10aa1fd332b23, type: 2}
   groundLayer: {fileID: 8574412962073106934, guid: 36273d67e33888e4bbc83a3981f39243, type: 2}
   arenaLayer: {fileID: 8574412962073106934, guid: 0e6bd9ceeb5bf204c814c5ee7afd2c81, type: 2}
   roadLayer: {fileID: 8574412962073106934, guid: ef0b183765135b64d80adee5c961998b, type: 2}

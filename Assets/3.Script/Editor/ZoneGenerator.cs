@@ -293,7 +293,8 @@ public static class ZoneGenerator
         Transform respawn = BuildRespawnPoint(theme, generated.transform, terrain);
 
         int wallRocks = PlaceWallRocks(theme, Group(generated, "WallRocks"), terrain);
-        int innerRocks = PlaceInnerRocks(theme, Group(generated, "InnerRocks"), terrain);
+        Transform innerGroup = Group(generated, "InnerRocks");
+        int innerRocks = PlaceInnerRocks(theme, innerGroup, terrain) + PlacePathEdge(theme, innerGroup, terrain); // 길가 바위 · 고사리
         int trees = PlaceTrees(theme, Group(generated, "Trees"), terrain);
         int cover = PlaceCover(theme, Group(generated, "Cover"), terrain);
         int stones = PlacePathStones(theme, Group(generated, "PathStones"), terrain);
@@ -336,11 +337,15 @@ public static class ZoneGenerator
         origin = theme.origin;
 
         Undo.RegisterCompleteObjectUndo(terrain.terrainData, "Repaint Zone");
+        WriteHeights(theme, terrain.terrainData); // 골짜기 · 비탈 등 높이도 다시 (공터 · 길 중심 높이는 그대로 0)
+        terrain.heightmapPixelError = 1f; // [변경] 먼 곳 LOD로 이웃 지형과 어긋나 틈이 보이지 않게
         PaintLayers(theme, terrain.terrainData);
+        RebuildInvisibleWall(theme, generated);
         EditorUtility.SetDirty(terrain.terrainData);
 
         int wallRocks = PlaceWallRocks(theme, Regroup(generated, "WallRocks"), terrain);
-        int innerRocks = PlaceInnerRocks(theme, Regroup(generated, "InnerRocks"), terrain);
+        Transform innerGroup = Regroup(generated, "InnerRocks");
+        int innerRocks = PlaceInnerRocks(theme, innerGroup, terrain) + PlacePathEdge(theme, innerGroup, terrain);
         int trees = PlaceTrees(theme, Regroup(generated, "Trees"), terrain);
         int cover = PlaceCover(theme, Regroup(generated, "Cover"), terrain);
         int stones = PlacePathStones(theme, Regroup(generated, "PathStones"), terrain);
@@ -349,6 +354,20 @@ public static class ZoneGenerator
         EditorSceneManager.MarkSceneDirty(root.scene);
         Debug.Log($"[ZoneGenerator] {theme.zoneName} 소품만 다시 생성 · 벽 바위 {wallRocks}, 안쪽 바위 {innerRocks}, 나무 {trees}, 풀·덤불 {cover}, 돌길 {stones}");
         return true;
+    }
+
+    // 길 양옆 투명 벽이 새 지형에 맞게 생기도록 다시 만듦 (끝 막이 여부는 기존 것을 따름)
+    static void RebuildInvisibleWall(ZoneTheme t, Transform generated)
+    {
+        Transform old = generated.Find("InvisibleWall");
+        bool capSouth = old != null && old.Find("Wall_SouthEnd") != null;
+        bool capNorth = old != null && old.Find("Wall_NorthEnd") != null;
+        int index = old != null ? old.GetSiblingIndex() : -1;
+        if (old != null) Undo.DestroyObjectImmediate(old.gameObject);
+        BuildInvisibleWall(t, generated, capSouth, capNorth);
+        Transform wall = generated.Find("InvisibleWall");
+        Undo.RegisterCreatedObjectUndo(wall.gameObject, "Rebuild Invisible Wall");
+        if (index >= 0) wall.SetSiblingIndex(index);
     }
 
     // 같은 이름 묶음을 지우고 같은 순서 자리에 빈 묶음을 새로 만듦
@@ -371,7 +390,7 @@ public static class ZoneGenerator
         float flat = t.wallRadius + 2f;
         float width = t.hillWidth;
         float k = Mathf.Clamp01(t.hillRoughness);
-        if (k > 0f) // [변경] 공터 가장자리를 방향마다 다르게 물리고, 언덕 폭도 곳곳 다르게
+        if (k > 0f) // 공터 가장자리를 방향마다 다르게 물리고, 언덕 폭도 곳곳 다르게
         {
             float a = Mathf.Atan2(z, x);
             flat += Mathf.PerlinNoise(Mathf.Cos(a) * 1.4f + t.seed * 3.3f, Mathf.Sin(a) * 1.4f + t.seed * 1.7f) * 7f * k;
@@ -382,7 +401,7 @@ public static class ZoneGenerator
 
         float noise = Mathf.PerlinNoise(x * 0.045f + t.seed * 13.1f, z * 0.045f + t.seed * 7.3f);
         float h = rise * (t.hillHeight + noise * t.hillNoise);
-        if (k > 0f) // [변경] 봉우리 · 골짜기 (큰 노이즈) + 잔굴곡 (작은 노이즈, 공터 밖에서만)
+        if (k > 0f) // 봉우리 · 골짜기 (큰 노이즈) + 잔굴곡 (작은 노이즈, 공터 밖에서만)
         {
             float big = Mathf.PerlinNoise(x * 0.018f + t.seed * 2.1f, z * 0.018f + t.seed * 4.7f);
             h = rise * (t.hillHeight * Mathf.Lerp(1f, 0.55f + 0.95f * big, k) + noise * t.hillNoise);
@@ -391,27 +410,33 @@ public static class ZoneGenerator
             h = Mathf.Max(0f, h);
         }
 
-        // 가장자리 SeamBand 구간은 공통 높이로 모아서 이웃 구역 지형과 높이를 맞춤
-        float toEdge = t.terrainSize * 0.5f - Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
-        h = Mathf.Lerp(SeamHeight, h, Mathf.Clamp01(toEdge / SeamBand));
+        // 길가 둑 폭을 곳곳 다르게(평행한 둑 방지) + 길 주변 언덕을 낮춰 골짜기처럼
+        float plainFade = Mathf.Max(1f, t.corridorFade);
+        float fade = plainFade;
+        if (k > 0f) fade *= Mathf.Lerp(1f, 0.6f + 0.8f * Mathf.PerlinNoise(x * 0.05f + t.seed * 8.3f, z * 0.05f + t.seed * 3.9f), k);
+        h = Cut(t, x, z, h, fade);
 
-        float corridor = GateStrip(t, x, z, t.gateHalfWidth, Mathf.Max(1f, t.corridorFade)); // [변경] 열린 문 방향으로만 길 · 비탈 폭은 테마
-        return h * (1f - corridor);
+        // [변경] 핵심: 이음매는 길 · 골짜기까지 다 깎은 뒤 마지막에 맞춤. 노이즈 없는 같은 규칙으로 깎은 높이로 모아야
+        // 이웃 구역(시드 · 로컬 좌표가 다름)과 경계가 정확히 같아져 틈이 안 생김
+        float toEdge = t.terrainSize * 0.5f - Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
+        float seam = Cut(t, x, z, SeamHeight, plainFade);
+        return Mathf.Lerp(seam, h, Mathf.Clamp01(toEdge / SeamBand));
     }
 
-    static Terrain BuildTerrain(ZoneTheme t, Transform parent)
+    static float Cut(ZoneTheme t, float x, float z, float h, float fade)
     {
-        if (!AssetDatabase.IsValidFolder(DataFolder)) AssetDatabase.CreateFolder("Assets/11.Data", "Zone");
-
-        string dataPath = $"{DataFolder}/{t.zoneName}_Terrain.asset";
-        var data = AssetDatabase.LoadAssetAtPath<TerrainData>(dataPath);
-        if (data == null)
+        if (t.valleyWidth > 0f)
         {
-            data = new TerrainData();
-            AssetDatabase.CreateAsset(data, dataPath);
+            float valley = GateStrip(t, x, z, t.gateHalfWidth + fade * 0.5f, t.valleyWidth);
+            valley = valley * valley * (3f - 2f * valley);
+            h *= Mathf.Lerp(1f, 0.3f, valley);
         }
+        return h * (1f - GateStrip(t, x, z, t.gateHalfWidth, fade)); // 열린 문 방향으로만 길
+    }
 
-        int res = t.hillRoughness > 0f ? 257 : 129; // [변경] 잔굴곡이 보이게 해상도 올림
+    static void WriteHeights(ZoneTheme t, TerrainData data)
+    {
+        int res = t.hillRoughness > 0f ? 257 : 129; // 잔굴곡이 보이게 해상도 올림
         float maxHeight = Mathf.Max(t.hillHeight * (t.hillRoughness > 0f ? 1.5f : 1f) + t.hillNoise + 1f, SeamHeight) + 2f;
         data.heightmapResolution = res;
         data.size = new Vector3(t.terrainSize, maxHeight, t.terrainSize);
@@ -426,12 +451,28 @@ public static class ZoneGenerator
             heights[iz, ix] = Height(t, x, z) / maxHeight;
         }
         data.SetHeights(0, 0, heights);
+    }
 
+    static Terrain BuildTerrain(ZoneTheme t, Transform parent)
+    {
+        if (!AssetDatabase.IsValidFolder(DataFolder)) AssetDatabase.CreateFolder("Assets/11.Data", "Zone");
+
+        string dataPath = $"{DataFolder}/{t.zoneName}_Terrain.asset";
+        var data = AssetDatabase.LoadAssetAtPath<TerrainData>(dataPath);
+        if (data == null)
+        {
+            data = new TerrainData();
+            AssetDatabase.CreateAsset(data, dataPath);
+        }
+
+        WriteHeights(t, data); // 소품만 다시 만들 때도 쓰도록 분리
         PaintLayers(t, data);
+        float half = t.terrainSize * 0.5f;
         EditorUtility.SetDirty(data);
         AssetDatabase.SaveAssets();
 
         GameObject go = Terrain.CreateTerrainGameObject(data);
+        go.GetComponent<Terrain>().heightmapPixelError = 1f; // [변경] 먼 곳 LOD로 이웃 지형과 어긋나 틈이 보이지 않게 (기본 5)
         go.name = "Terrain";
         go.transform.SetParent(parent, false);
         go.transform.position = origin + new Vector3(-half, 0f, -half);
@@ -441,9 +482,11 @@ public static class ZoneGenerator
     // 레이어 0 풀, 1 아레나 흙 마당, 2 문 앞 길
     static void PaintLayers(ZoneTheme t, TerrainData data)
     {
-        var layers = t.extraLayer != null && t.extraAmount > 0f // 4번째 질감은 있을 때만
-            ? new[] { t.groundLayer, t.arenaLayer, t.roadLayer, t.extraLayer }
-            : new[] { t.groundLayer, t.arenaLayer, t.roadLayer };
+        var list = new List<TerrainLayer> { t.groundLayer, t.arenaLayer, t.roadLayer };
+        int extraIndex = -1, slopeIndex = -1; // 4 · 5번째 질감은 있을 때만
+        if (t.extraLayer != null && t.extraAmount > 0f) { extraIndex = list.Count; list.Add(t.extraLayer); }
+        if (t.slopeLayer != null) { slopeIndex = list.Count; list.Add(t.slopeLayer); }
+        var layers = list.ToArray();
         if (layers.Any(l => l == null))
         {
             Debug.LogWarning("[ZoneGenerator] Terrain Layer가 비어 있어 칠하기를 건너뜁니다.");
@@ -469,7 +512,7 @@ public static class ZoneGenerator
 
             // 바깥 땅 일부를 4번째 질감으로: 얼룩 노이즈 + 언덕으로 갈수록 많이
             float extra = 0f;
-            if (layers.Length > 3)
+            if (extraIndex >= 0)
             {
                 float patch = Mathf.PerlinNoise(x * 0.07f + t.seed * 3.7f, z * 0.07f + t.seed * 5.1f);
                 float hill = Mathf.Clamp01((r - flat) / Mathf.Max(1f, t.hillWidth));
@@ -478,10 +521,17 @@ public static class ZoneGenerator
             }
             float sum = arena + road + grass + extra;
 
-            maps[iz, ix, 0] = grass / sum;
-            maps[iz, ix, 1] = arena / sum;
-            maps[iz, ix, 2] = road / sum;
-            if (layers.Length > 3) maps[iz, ix, 3] = extra / sum;
+            // 가파른 곳(25°~40°)은 돌 질감으로 덮음 → 비탈에 늘어진 낙엽 질감이 안 보이게
+            float slope = 0f;
+            if (slopeIndex >= 0)
+                slope = Mathf.Clamp01((data.GetSteepness((ix + 0.5f) / res, (iz + 0.5f) / res) - 25f) / 15f);
+            float keep = (1f - slope) / sum;
+
+            maps[iz, ix, 0] = grass * keep;
+            maps[iz, ix, 1] = arena * keep;
+            maps[iz, ix, 2] = road * keep;
+            if (extraIndex >= 0) maps[iz, ix, extraIndex] = extra * keep;
+            if (slopeIndex >= 0) maps[iz, ix, slopeIndex] = slope;
         }
         data.SetAlphamaps(0, 0, maps);
     }
@@ -509,8 +559,8 @@ public static class ZoneGenerator
             seg.AddComponent<BoxCollider>().size = new Vector3(length, 6f, 1f);
         }
 
-        // [변경] 길 비탈이 완만하면(corridorFade > 6) 길가 언덕으로 올라가 지형 밖으로 나갈 수 있어 길 양옆을 굽은 길 따라 막음
-        if (t.corridorFade > 6f) BuildCorridorWalls(t, wall.transform);
+        // 길 비탈이 완만하면(corridorFade > 6) 길가 언덕으로 올라가 지형 밖으로 나갈 수 있어 길 양옆을 굽은 길 따라 막음
+        if (t.corridorFade > 6f || t.valleyWidth > 0f) BuildCorridorWalls(t, wall.transform); // 골짜기도 오를 수 있어 막음
 
         // 문 밖 길 끝은 지형 가장자리라 떨어지지 않게 막음
         float end = t.terrainSize * 0.5f - 3f;
@@ -580,7 +630,7 @@ public static class ZoneGenerator
     static float GateStrip(ZoneTheme t, float x, float z, float halfWidth, float fade)
     {
         float v = 0f;
-        // [변경] 길 중심선이 Meander만큼 옆(문 기준 side 방향)으로 굽음. 북 +x · 남 -x · 동 -z · 서 +z → 이웃 구역과 이어지면 S자
+        // 길 중심선이 Meander만큼 옆(문 기준 side 방향)으로 굽음. 북 +x · 남 -x · 동 -z · 서 +z → 이웃 구역과 이어지면 S자
         if (t.gateNorth && z >= 0f) v = Mathf.Max(v, Strip(x - Meander(t, z), halfWidth, fade));
         if (t.gateSouth && z <= 0f) v = Mathf.Max(v, Strip(x + Meander(t, -z), halfWidth, fade));
         if (t.gateEast && x >= 0f) v = Mathf.Max(v, Strip(z + Meander(t, x), halfWidth, fade));
@@ -628,7 +678,7 @@ public static class ZoneGenerator
         var point = new GameObject("RespawnPoint");
         point.transform.SetParent(parent, false);
         Vector3 dir = EntranceDir(t); // 입구가 동 · 서 · 북이어도 그 문 바깥
-        Vector3 local = dir * (t.wallRadius + 3f) + Side(dir) * Meander(t, t.wallRadius + 3f); // [변경] 굽은 길 위
+        Vector3 local = dir * (t.wallRadius + 3f) + Side(dir) * Meander(t, t.wallRadius + 3f); // 굽은 길 위
         local.y = GroundY(terrain, origin + local) + 0.1f;
         point.transform.localPosition = local;
         point.transform.localRotation = Quaternion.LookRotation(-dir, Vector3.up);
@@ -686,6 +736,40 @@ public static class ZoneGenerator
         return count;
     }
 
+    // 길가를 따라 불규칙한 간격으로 작은 바위 · 고사리 (곧은 둑 대신 숲길 가장자리처럼)
+    static int PlacePathEdge(ZoneTheme t, Transform parent, Terrain terrain)
+    {
+        if (t.valleyWidth <= 0f) return 0;
+        bool rocks = t.wallRocks != null && t.wallRocks.Length > 0;
+        bool ferns = t.outerCover != null && t.outerCover.Length > 0;
+        if (!rocks && !ferns) return 0;
+
+        int count = 0;
+        float end = t.terrainSize * 0.5f - 4f;
+        var dirs = new List<Vector3>();
+        if (t.gateSouth) dirs.Add(Vector3.back);
+        if (t.gateNorth) dirs.Add(Vector3.forward);
+        if (t.gateEast) dirs.Add(Vector3.right);
+        if (t.gateWest) dirs.Add(Vector3.left);
+        foreach (Vector3 dir in dirs)
+        {
+            Vector3 side = Side(dir);
+            foreach (float s in new[] { -1f, 1f })
+            {
+                for (float d = t.wallRadius + 2f + RangeF(0f, 3f); d < end; d += RangeF(2.5f, 6f))
+                {
+                    Vector3 pos = dir * d + side * (Meander(t, d) + s * (t.gateHalfWidth + RangeF(0.8f, 2.8f)));
+                    if (rocks && (!ferns || RangeF(0f, 1f) < 0.55f))
+                        Spawn(Pick(t.wallRocks), parent, terrain, pos, RangeF(1.5f, 3.5f), false, 0.15f, true);
+                    else
+                        Spawn(Pick(t.outerCover), parent, terrain, pos, 0f, false, 0f, false);
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     static int PlaceInnerRocks(ZoneTheme t, Transform parent, Terrain terrain)
     {
         if (!HasAny(t.innerRocks, "Inner Rocks")) return 0;
@@ -715,7 +799,7 @@ public static class ZoneGenerator
             Vector3 pos = new Vector3(RangeF(-half, half), 0f, RangeF(-half, half));
             float r = new Vector2(pos.x, pos.z).magnitude;
             if (r < t.wallRadius + 2.5f) continue;
-            if (InGate(t, pos, 2.5f)) continue;
+            if (InGate(t, pos, t.valleyWidth > 0f ? 4f : 2.5f)) continue; // 골짜기면 투명 벽 바로 뒤부터 숲
             if (placed.Any(p => (p - pos).sqrMagnitude < minSqr)) continue;
 
             placed.Add(pos);
@@ -796,7 +880,7 @@ public static class ZoneGenerator
             Vector3 side = Side(dir); // 길 가로 방향으로 살짝 흔듦
             for (float d = t.wallRadius + 1.5f; d < end; d += t.pathStoneSpacing)
             {
-                Vector3 pos = dir * d + side * (Meander(t, d) + RangeF(-0.6f, 0.6f)); // [변경] 굽은 길 따라
+                Vector3 pos = dir * d + side * (Meander(t, d) + RangeF(-0.6f, 0.6f)); // 굽은 길 따라
                 Spawn(Pick(t.pathStones), parent, terrain, pos, t.pathStoneSize, false, 0.05f, false);
                 count++;
             }

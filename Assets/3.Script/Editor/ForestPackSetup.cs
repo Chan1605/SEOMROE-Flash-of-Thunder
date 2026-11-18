@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -8,14 +7,13 @@ using UnityEngine.Rendering.Universal;
 
 // 실사 숲(NatureManufacture Forest Environment) 적용: 구역 테마의 나무 · 바위 · 풀 · 지형 질감을 새 팩으로 바꾸고 그 구역을 다시 생성
 // Tools/Map/Forest Pack/...  (InGame 씬을 열어 두고 실행)
-//  - 처음 바꿀 때 원래 테마를 11.Data/Zone/Toon Backup에 복사해 둠 → Restore Toon Themes로 언제든 되돌림
+//  - 카툰 테마 백업 · 되돌리기는 옛 맵 소스 정리와 함께 삭제
 //  - 구역 이름 · 크기 · 문 · 웨이브 · 정자 같은 랜드마크 · 하늘 · 안개는 그대로 (나무 · 바위 · 풀 · 바닥만)
 public static class ForestPackSetup
 {
     const string Root = "Assets/NatureManufacture Assets/Forest Environment Dynamic Nature/";
     const string WindPrefabPath = "Assets/NatureManufacture Assets/NatureManufacture Wind/Prefab_Wind.prefab";
     const string ZoneFolder = "Assets/11.Data/Zone/";
-    const string BackupFolder = ZoneFolder + "Toon Backup";
     const string LayerFolder = ZoneFolder + "Forest Layers"; // 광택을 줄인 지형 레이어 사본
     const string LookFolder = ZoneFolder + "Forest Look"; // 하늘 재질 · 후처리 프로필
     const string LookName = "ForestLook";
@@ -57,7 +55,6 @@ public static class ForestPackSetup
         }
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
         string returnTo = EditorSceneManager.GetActiveScene().path;
-        if (!AssetDatabase.IsValidFolder(BackupFolder)) AssetDatabase.CreateFolder(ZoneFolder.TrimEnd('/'), "Toon Backup");
 
         var set = Load();
         int zones = 0;
@@ -78,14 +75,12 @@ public static class ForestPackSetup
         Debug.Log($"[ForestPack] 다른 씬 {OtherScenes.Length}개 · 구역 {zones}개에 실사 숲 적용 · 씬 저장까지 완료");
     }
 
-    // 원본 백업(처음 한 번) → 배치 목록 교체 → 저장
+    // 배치 목록 교체 → 저장 (카툰 원본 백업 삭제)
     static ZoneTheme PrepareTheme(string themeName, PackSet set)
     {
         string path = $"{ZoneFolder}{themeName}.asset";
         var theme = AssetDatabase.LoadAssetAtPath<ZoneTheme>(path);
         if (theme == null) { Debug.LogWarning($"[ForestPack] {path} 없음 · 건너뜀"); return null; }
-        string backup = $"{BackupFolder}/{themeName}.asset";
-        if (!File.Exists(backup)) AssetDatabase.CopyAsset(path, backup);
         ApplyTo(theme, set);
         EditorUtility.SetDirty(theme);
         AssetDatabase.SaveAssets();
@@ -205,8 +200,7 @@ public static class ForestPackSetup
         if (theme == null) return;
         Mood mood = MoodOf(Zones[index].theme);
         ApplyLookTo(theme, set, mood);
-        // [변경] 본편만 지형까지 다시 만듦 → 자연스러운 언덕 · S자 길 · 완만한 길가 (다른 씬은 소품만 다시 만들어서 지형 값은 안 바꿈)
-        theme.hillRoughness = 1f;
+        // 본편만 지형까지 다시 만듦 → 자연스러운 언덕 · S자 길 · 완만한 길가 (다른 씬은 소품만 다시 만들어서 지형 값은 안 바꿈)
         theme.pathMeander = 7f;
         theme.corridorFade = 11f;
         EditorUtility.SetDirty(theme);
@@ -220,7 +214,6 @@ public static class ForestPackSetup
 
     static void EnsureFolders()
     {
-        if (!AssetDatabase.IsValidFolder(BackupFolder)) AssetDatabase.CreateFolder(ZoneFolder.TrimEnd('/'), "Toon Backup");
         if (!AssetDatabase.IsValidFolder(LookFolder)) AssetDatabase.CreateFolder(ZoneFolder.TrimEnd('/'), "Forest Look");
     }
 
@@ -257,6 +250,11 @@ public static class ForestPackSetup
 
         theme.extraLayer = Layer("Terrain_Layer6_Moss", 0.3f);
         theme.extraAmount = 0.7f;
+
+        // 협곡처럼 깎인 길 → 낮은 골짜기 + 불규칙한 언덕 + 비탈은 돌 질감 (모든 씬, 길 굽힘만 본편)
+        theme.hillRoughness = 1f;
+        theme.valleyWidth = 26f;
+        theme.slopeLayer = Layer("Terrain_Layer8_Stones", 0.3f);
 
         // 바위 고리 사이사이 쓰러진 통나무 · 뿌리 (같은 크기 규칙으로 섞임)
         theme.wallRocks = Concat(set.wallRocks,
@@ -371,29 +369,6 @@ public static class ForestPackSetup
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    [MenuItem("Tools/Map/Forest Pack/Restore Toon Themes")]
-    static void Restore()
-    {
-        if (!InGameOpen()) return;
-        int restored = 0;
-        foreach (var zone in Zones)
-        {
-            string themeName = zone.theme, menu = zone.menu;
-            var backup = AssetDatabase.LoadAssetAtPath<ZoneTheme>($"{BackupFolder}/{themeName}.asset");
-            var theme = AssetDatabase.LoadAssetAtPath<ZoneTheme>($"{ZoneFolder}{themeName}.asset");
-            if (backup == null || theme == null) continue;
-            EditorUtility.CopySerialized(backup, theme);
-            EditorUtility.SetDirty(theme);
-            GameObject root = GameObject.Find(theme.zoneName); // 숲 후처리 볼륨도 치움
-            Transform look = root != null ? root.transform.Find(LookName) : null;
-            if (look != null) Object.DestroyImmediate(look.gameObject);
-            AssetDatabase.SaveAssets();
-            EditorApplication.ExecuteMenuItem(menu);
-            restored++;
-        }
-        Debug.Log($"[ForestPack] 카툰 테마로 되돌림 · {restored}개 구역 다시 생성 → 씬을 저장하세요");
-    }
-
     static void Apply(int from, int to)
     {
         if (!InGameOpen()) return;
@@ -402,12 +377,11 @@ public static class ForestPackSetup
             Debug.LogError("[ForestPack] NatureManufacture Assets 폴더가 없습니다. 팩과 URP 17.1 지원팩을 먼저 Import하세요.");
             return;
         }
-        if (!AssetDatabase.IsValidFolder(BackupFolder)) AssetDatabase.CreateFolder(ZoneFolder.TrimEnd('/'), "Toon Backup");
 
         var set = Load();
         for (int i = from; i < to; i++)
         {
-            if (PrepareTheme(Zones[i].theme, set) == null) continue; // 백업 · 교체를 다른 씬 메뉴와 공용으로
+            if (PrepareTheme(Zones[i].theme, set) == null) continue; // [변경] 교체를 다른 씬 메뉴와 공용으로
             EditorApplication.ExecuteMenuItem(Zones[i].menu); // 이 구역만 다시 생성 (웨이브 · 직접 배치한 오브젝트는 유지)
         }
         EnsureWind();

@@ -29,10 +29,12 @@ public class ZoneTheme : ScriptableObject
     public float hillHeight = 10f;
     public float hillNoise = 4f;
     public float hillWidth = 22f;
-    // [변경] 자연스러운 지형: 공터 가장자리 · 언덕 높이 · 폭을 노이즈로 흔들고(0 = 예전 매끈한 고리), 문 밖 길을 S자로 굽힘(m)
+    // 자연스러운 지형: 공터 가장자리 · 언덕 높이 · 폭을 노이즈로 흔들고(0 = 예전 매끈한 고리), 문 밖 길을 S자로 굽힘(m)
     public float hillRoughness = 0f;
     public float pathMeander = 0f;
     public float corridorFade = 6f; // 길 양옆 비탈 폭 (클수록 완만 · 길가는 투명 벽이 막음)
+    public float valleyWidth = 0f;  // [변경] 길 양옆 이 폭 안의 언덕을 낮춰 협곡 대신 완만한 골짜기로 (0 = 끔)
+    public TerrainLayer slopeLayer; // [변경] 가파른 비탈에 칠할 질감 (돌 등) · 늘어진 낙엽 질감을 가림
     public TerrainLayer groundLayer;
     public TerrainLayer arenaLayer;
     public TerrainLayer roadLayer;

@@ -10,7 +10,8 @@ using UnityEngine;
 //    남길 프리팹과 그 의존성(머티리얼·텍스처·셰이더·스크립트), 팩 밖에서 참조하는 에셋은 모두 보존
 //  - 젠이츠 칼: Player 프리팹에서 빼고 모델 폴더와 칼 전환용 셋업 스크립트를 지움 (Samurai 팩 칼로 확정)
 //  - 안 쓰는 기능 정리: 저스트 회피 반격 · 손 축 보정(WeaponBoneRetarget) · 잔심 자세(Skill_Finish)의 데이터·상태·스크립트
-//  - 팩 프리팹의 빠진 스크립트 컴포넌트 제거 (원본 팩에 없는 스크립트를 참조해 실행 중 경고가 뜸) // [변경]
+//  - 팩 프리팹의 빠진 스크립트 컴포넌트 제거 (원본 팩에 없는 스크립트를 참조해 실행 중 경고가 뜸)
+//  - [변경] 옛 맵 소스: 실사 숲으로 바꾼 뒤 안 쓰는 Toon Fantasy Nature 에셋 · 설치 패키지 · 옛 수련장/백업 테마 · 자동 변환 지형 레이어
 // 먼저 "(미리보기)" 메뉴로 콘솔에서 지울 목록을 확인한 뒤 실행
 public static class ThirdPartyCleanup
 {
@@ -136,6 +137,70 @@ public static class ThirdPartyCleanup
         }
     }
 
+    // [변경] 옛 맵 소스 정리
+    const string ToonRoot = "Assets/ThirdParty/Toon Fantasy Nature";
+    const string ZoneData = "Assets/11.Data/Zone/";
+    static readonly string[] OldMapFolders = { ZoneData + "Toon Backup", "Assets/_TerrainAutoUpgrade" };
+    static readonly string[] OldZoneData = // 지금 씬에 없는 옛 수련장 구성 (Tutorial_Arena_Terrain은 수련장이 아직 씀)
+    {
+        "Tutorial_Station1", "Tutorial_Station2", "Tutorial_Station3", "Tutorial_Station4",
+        "Tutorial_1_Terrain", "Tutorial_2_Terrain", "Tutorial_3_Terrain", "Tutorial_4_Terrain",
+        "Tutorial_Dojo", "Tutorial_Dojo_Terrain", "Tutorial_Arena",
+    };
+
+    [MenuItem("Tools/Cleanup/Remove Old Map Assets (미리보기)")]
+    static void OldMapPreview() => RemoveOldMap(false);
+
+    [MenuItem("Tools/Cleanup/Remove Old Map Assets")]
+    static void OldMapRun()
+    {
+        if (!EditorUtility.DisplayDialog("옛 맵 소스 정리", "씬 · 프리팹 · 데이터가 쓰지 않는 Toon Fantasy Nature 에셋과 옛 테마를 지웁니다.\n(ThirdParty 서브모듈은 git으로 되돌릴 수 있음)", "정리", "취소")) return;
+        RemoveOldMap(true);
+    }
+
+    // 핵심: 지울 후보 = 팩 전체 + 옛 데이터. 그중 남는 씬 · 프리팹 · 데이터가 의존하는 것은 보존 (정자 · 등불 · 셰이더 등)
+    static void RemoveOldMap(bool delete)
+    {
+        var candidates = new List<string>();
+        if (AssetDatabase.IsValidFolder(ToonRoot)) candidates.AddRange(FilesIn(ToonRoot));
+        foreach (string folder in OldMapFolders)
+            if (AssetDatabase.IsValidFolder(folder)) candidates.AddRange(FilesIn(folder));
+        foreach (string name in OldZoneData)
+        {
+            string path = ZoneData + name + ".asset";
+            if (File.Exists(path)) candidates.Add(path);
+        }
+        var candidateSet = new HashSet<string>(candidates);
+
+        string[] users = AssetDatabase.GetAllAssetPaths()
+            .Where(p => p.StartsWith("Assets/") && !candidateSet.Contains(p) && !p.StartsWith("Assets/NatureManufacture Assets/"))
+            .Where(p => p.EndsWith(".unity") || p.EndsWith(".prefab") || p.EndsWith(".asset") || p.EndsWith(".mat") ||
+                        p.EndsWith(".controller") || p.EndsWith(".terrainlayer") || p.EndsWith(".playable"))
+            .ToArray();
+        var used = new HashSet<string>(AssetDatabase.GetDependencies(users, true));
+
+        List<string> keep = candidates.Where(used.Contains).OrderBy(p => p).ToList();
+        List<string> remove = candidates.Where(p => !used.Contains(p)).ToList();
+        long bytes = remove.Sum(p => File.Exists(p) ? new FileInfo(p).Length : 0L);
+        Debug.Log($"[Cleanup] 옛 맵 소스 {candidates.Count}개 중 보존 {keep.Count}개 · 삭제 {remove.Count}개 ({bytes / 1048576f:0.0}MB)\n" +
+                  "보존(아직 씬 · 프리팹 · 데이터가 씀):\n" + string.Join("\n", keep));
+        if (!delete) return;
+
+        var failed = new List<string>();
+        AssetDatabase.DeleteAssets(remove.ToArray(), failed);
+        if (AssetDatabase.IsValidFolder(ToonRoot)) DeleteEmptyFolders(ToonRoot);
+        foreach (string folder in OldMapFolders)
+            if (AssetDatabase.IsValidFolder(folder)) DeleteEmptyFolders(folder);
+        AssetDatabase.Refresh();
+        Debug.Log(failed.Count == 0 ? "[Cleanup] 옛 맵 소스 정리 완료 → ThirdParty 서브모듈과 본 저장소를 각각 커밋하세요" : "[Cleanup] 지우지 못한 파일:\n" + string.Join("\n", failed));
+    }
+
+    static IEnumerable<string> FilesIn(string folder) =>
+        AssetDatabase.FindAssets("", new[] { folder })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Where(p => !AssetDatabase.IsValidFolder(p))
+            .Distinct();
+
     [MenuItem("Tools/Cleanup/Remove Zenitsu Katana")]
     static void RemoveZenitsu()
     {
@@ -227,7 +292,7 @@ public static class ThirdPartyCleanup
         Debug.Log(failed.Count == 0 ? "[Cleanup] 안 쓰는 기능 정리 완료" : "[Cleanup] 지우지 못한 파일:\n" + string.Join("\n", failed));
     }
 
-    // [변경] Par_YellowSwordBeam_Muzzle 등 팩 프리팹에 원본 팩에도 없는 스크립트(그라데이션 매핑)가 붙어 있어 생성할 때마다 경고
+    // Par_YellowSwordBeam_Muzzle 등 팩 프리팹에 원본 팩에도 없는 스크립트(그라데이션 매핑)가 붙어 있어 생성할 때마다 경고
     // 파티클 머티리얼에 색이 이미 들어가 있어 지워도 겉모습은 그대로
     [MenuItem("Tools/Cleanup/Remove Missing Scripts (Projectiles)")]
     static void RemoveMissingScripts()
