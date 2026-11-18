@@ -238,7 +238,7 @@ public static class ForestPackSetup
         }
         else // 밤: 카툰 남색 하늘 대신 어두운 사실적 밤하늘 + 짙은 남색 안개 (달빛 색 · 각도는 원래 테마)
         {
-            theme.skybox = SkyMaterial("Forest_Sky_Night", new Color(0.2f, 0.25f, 0.36f), 0.4f, 0.02f, 0.2f);
+            theme.skybox = SkyMaterial("Forest_Sky_Night", new Color(0.2f, 0.25f, 0.36f), 0.4f, 0.02f, 1.02f); // [변경] 사용자 조정값 (하늘 노출 0.2 → 1.02)
             theme.fogColor = new Color(0.07f, 0.09f, 0.13f);
             theme.fogDensity = 0.02f;
         }
@@ -304,9 +304,10 @@ public static class ForestPackSetup
         }
         else if (mood == Mood.Night)
         {
-            exposure = 0.45f; contrast = 12f; saturation = -14f; temperature = -10f; bloomIntensity = 0.6f; vignetteIntensity = 0.3f; // 너무 밝아 낮처럼 보임 → 낮춤
-            gamma = 0.06f; gain = 0.08f;
-            shadows = new Vector4(0.9f, 0.95f, 1.1f, 0.08f); // 적 실루엣만 보일 만큼 그늘을 들어 올림
+            // [변경] 사용자 조정값 (던전 확인): 노출 0.45 → 0.7, 감마 0.06 → 0.1
+            exposure = 0.7f; contrast = 12f; saturation = -14f; temperature = -10f; bloomIntensity = 0.6f; vignetteIntensity = 0.3f;
+            gamma = 0.1f; gain = 0.08f;
+            shadows = new Vector4(0.818f, 0.864f, 1f, 0.08f); // 그늘은 푸르게 · 적 실루엣만 보일 만큼 들어 올림
             highlights = new Vector4(1f, 1f, 1f, 0f);
         }
 
@@ -492,7 +493,7 @@ public static class ForestPackSetup
         if (!AssetDatabase.IsValidFolder(StructureFolder)) AssetDatabase.CreateFolder(LookFolder, "Structures");
         set.lacquer = WoodMaterial("Torii_Lacquer", new Color(0.66f, 0.16f, 0.08f), 0.38f, new Vector2(1f, 3f));
         set.blackWood = WoodMaterial("Torii_Black", new Color(0.09f, 0.08f, 0.075f), 0.3f, new Vector2(3f, 1f));
-        // [변경] 팩 돌 재질(Top Cover 셰이더)은 기본 상자 메시에서 NaN 픽셀 → 블룸이 하얀 덩어리로 번짐. 팩 돌 질감으로 URP Lit 재질을 따로 만듦
+        // 팩 돌 재질(Top Cover 셰이더)은 기본 상자 메시에서 NaN 픽셀 → 블룸이 하얀 덩어리로 번짐. 팩 돌 질감으로 URP Lit 재질을 따로 만듦
         set.stone = TexMaterial("Torii_Stone", new Color(0.85f, 0.85f, 0.82f), 0.25f, new Vector2(1f, 1f), StoneTex + "BC_SM.tga", StoneTex + "N.png");
         Material roof = WoodMaterial("Shrine_Roof", new Color(0.2f, 0.17f, 0.15f), 0.2f, new Vector2(4f, 4f));
         set.shrine = BuildShrine(set, roof);
