@@ -3,6 +3,8 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 // 실사 숲(NatureManufacture Forest Environment) 적용: 구역 테마의 나무 · 바위 · 풀 · 지형 질감을 새 팩으로 바꾸고 그 구역을 다시 생성
 // Tools/Map/Forest Pack/...  (InGame 씬을 열어 두고 실행)
@@ -15,6 +17,8 @@ public static class ForestPackSetup
     const string ZoneFolder = "Assets/11.Data/Zone/";
     const string BackupFolder = ZoneFolder + "Toon Backup";
     const string LayerFolder = ZoneFolder + "Forest Layers"; // 광택을 줄인 지형 레이어 사본
+    const string LookFolder = ZoneFolder + "Forest Look"; // 하늘 재질 · 후처리 프로필
+    const string LookName = "ForestLook";
     const string WindName = "NM_Wind";
 
     // ZoneGenerator 메뉴와 같은 순서
@@ -33,7 +37,7 @@ public static class ForestPackSetup
     [MenuItem("Tools/Map/Forest Pack/Apply To All Zones")]
     static void ApplyAll() => Apply(0, Zones.Length);
 
-    // [변경] 본편 외 씬: 씬마다 열어서 테마 교체 → 소품 · 지형 질감만 다시 생성 (결계 · 포탈 · 진행기 연결 유지) → 저장
+    // 본편 외 씬: 씬마다 열어서 테마 교체 → 소품 · 지형 질감만 다시 생성 (결계 · 포탈 · 진행기 연결 유지) → 저장
     static readonly (string scene, string[] themes)[] OtherScenes =
     {
         ("Assets/1.Scene/Dungeon.unity", new[] { "Dungeon_West", "Dungeon_East", "Dungeon_North", "Dungeon_Hub" }),
@@ -88,6 +92,285 @@ public static class ForestPackSetup
         return theme;
     }
 
+    // 숲 분위기 전체 적용. 분위기 3종: 낮(본편 1~3) · 노을(보스 · 시련 · 수련장 · 연습장) · 밤(던전 · 마을)
+    enum Mood { Day, Dusk, Night }
+
+    static Mood MoodOf(string themeName)
+    {
+        if (themeName.StartsWith("Dungeon") || themeName.StartsWith("Village")) return Mood.Night;
+        if (themeName == "Zone4_Boss" || themeName == "Zone3_Trial" || themeName.StartsWith("Tutorial") || themeName.StartsWith("Training")) return Mood.Dusk;
+        return Mood.Day;
+    }
+
+    // 씬마다 주변광 세기 (밤 씬은 하늘이 어두워 주변광이 거의 없음 → 크게 올림)
+    static readonly (string scene, float ambient)[] AmbientScenes =
+    {
+        ("Assets/1.Scene/InGame.unity", 1.15f),
+        ("Assets/1.Scene/Dungeon.unity", 1.3f), // 1.6 → 1.3
+        ("Assets/1.Scene/Village.unity", 1.3f),
+        ("Assets/1.Scene/Tutorial.unity", 1.15f),
+        ("Assets/1.Scene/Training.unity", 1.15f),
+    };
+
+    static void SetAmbient(string scenePath)
+    {
+        foreach (var entry in AmbientScenes)
+            if (entry.scene == scenePath) RenderSettings.ambientIntensity = entry.ambient;
+    }
+
+    // 지형 · 소품은 그대로 두고 색보정 프로필 3종 + 씬별 주변광만 갱신 (다시 생성 없이 빠르게)
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/Update Brightness (All Scenes)")]
+    static void UpdateBrightness()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+        string returnTo = EditorSceneManager.GetActiveScene().path;
+        EnsureFolders();
+        LookProfile(Mood.Day);
+        LookProfile(Mood.Dusk);
+        LookProfile(Mood.Night);
+        foreach (var entry in AmbientScenes)
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(entry.scene) == null) continue;
+            var scene = EditorSceneManager.OpenScene(entry.scene, OpenSceneMode.Single);
+            RenderSettings.ambientIntensity = entry.ambient;
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+        if (!string.IsNullOrEmpty(returnTo)) EditorSceneManager.OpenScene(returnTo, OpenSceneMode.Single);
+        Debug.Log("[ForestPack] 밝기 갱신 · 색보정 3종 + 씬 주변광 저장 완료");
+    }
+
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/Zone 1 (Sanmun)")]
+    static void LookZone1()
+    {
+        if (!InGameOpen()) return;
+        ApplyLook(0);
+        Debug.Log("[ForestPack] 구역 1 숲 분위기 적용 → 씬을 저장하세요");
+    }
+
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/All Zones (InGame)")]
+    static void LookAllZones()
+    {
+        if (!InGameOpen()) return;
+        for (int i = 0; i < Zones.Length; i++) ApplyLook(i);
+        SetAmbient(EditorSceneManager.GetActiveScene().path);
+        Debug.Log($"[ForestPack] 본편 {Zones.Length}개 구역 숲 분위기 적용 → 씬을 저장하세요");
+    }
+
+    // 다른 씬은 결계 · 포탈 연결 때문에 소품만 다시 만들고(RebuildProps), 구역이 없는 씬 분위기는 에디터에서 RenderSettings로 저장
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/Other Scenes (Dungeon · Village · Tutorial · Training)")]
+    static void LookOtherScenes()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+        string returnTo = EditorSceneManager.GetActiveScene().path;
+        EnsureFolders();
+
+        var set = Load();
+        int zones = 0;
+        foreach (var entry in OtherScenes)
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(entry.scene) == null) { Debug.LogWarning($"[ForestPack] 씬 없음: {entry.scene}"); continue; }
+            var scene = EditorSceneManager.OpenScene(entry.scene, OpenSceneMode.Single);
+            SetAmbient(entry.scene);
+            ZoneTheme last = null;
+            foreach (string themeName in entry.themes)
+            {
+                ZoneTheme theme = PrepareTheme(themeName, set);
+                if (theme == null) continue;
+                Mood mood = MoodOf(themeName);
+                ApplyLookTo(theme, set, mood);
+                EditorUtility.SetDirty(theme);
+                AssetDatabase.SaveAssets();
+                if (!ZoneGenerator.RebuildProps(theme)) continue;
+                EnsureLookVolume(theme, mood);
+                last = theme;
+                zones++;
+            }
+            if (last != null) ZoneGenerator.ApplyAtmosphere(last); // 밤도 새 하늘 적용 · 씬 기본 분위기 = 마지막 구역
+            EnsureWind();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+        if (!string.IsNullOrEmpty(returnTo)) EditorSceneManager.OpenScene(returnTo, OpenSceneMode.Single);
+        Debug.Log($"[ForestPack] 다른 씬 구역 {zones}개 숲 분위기 적용 · 저장 완료");
+    }
+
+    static void ApplyLook(int index)
+    {
+        EnsureFolders();
+        var set = Load();
+        ZoneTheme theme = PrepareTheme(Zones[index].theme, set);
+        if (theme == null) return;
+        Mood mood = MoodOf(Zones[index].theme);
+        ApplyLookTo(theme, set, mood);
+        // [변경] 본편만 지형까지 다시 만듦 → 자연스러운 언덕 · S자 길 · 완만한 길가 (다른 씬은 소품만 다시 만들어서 지형 값은 안 바꿈)
+        theme.hillRoughness = 1f;
+        theme.pathMeander = 7f;
+        theme.corridorFade = 11f;
+        EditorUtility.SetDirty(theme);
+        AssetDatabase.SaveAssets();
+        EditorApplication.ExecuteMenuItem(Zones[index].menu); // 웨이브 · 직접 둔 오브젝트 유지
+
+        EnsureLookVolume(theme, mood);
+        EnsureWind();
+        EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+    }
+
+    static void EnsureFolders()
+    {
+        if (!AssetDatabase.IsValidFolder(BackupFolder)) AssetDatabase.CreateFolder(ZoneFolder.TrimEnd('/'), "Toon Backup");
+        if (!AssetDatabase.IsValidFolder(LookFolder)) AssetDatabase.CreateFolder(ZoneFolder.TrimEnd('/'), "Forest Look");
+    }
+
+    // 핵심: 화면 인상을 정하는 값들. 소품 교체(ApplyTo) 위에 덮음. 밤은 달빛 색 · 각도만 원래 테마
+    static void ApplyLookTo(ZoneTheme theme, PackSet set, Mood mood)
+    {
+        if (mood == Mood.Day)
+        {
+            theme.skybox = SkyMaterial("Forest_Sky", new Color(0.42f, 0.5f, 0.56f), 0.85f, 0.035f, 1.35f);
+            theme.fogColor = new Color(0.56f, 0.62f, 0.6f);   // 초록빛 도는 회색 숲 공기
+            theme.fogDensity = 0.014f;
+            theme.sunColor = new Color(1f, 0.9f, 0.74f);
+            theme.sunEuler = new Vector3(38f, -40f, 0f);       // 낮은 해 → 나무 그림자가 공터로 길게
+        }
+        else if (mood == Mood.Dusk)
+        {
+            theme.skybox = SkyMaterial("Forest_Sky_Dusk", new Color(0.52f, 0.42f, 0.4f), 1.6f, 0.05f, 1.25f);
+            theme.fogColor = new Color(0.6f, 0.5f, 0.45f);
+            theme.fogDensity = 0.016f;
+            theme.sunColor = new Color(1f, 0.7f, 0.48f);
+            theme.sunEuler = new Vector3(16f, -50f, 0f);
+        }
+        else // 밤: 카툰 남색 하늘 대신 어두운 사실적 밤하늘 + 짙은 남색 안개 (달빛 색 · 각도는 원래 테마)
+        {
+            theme.skybox = SkyMaterial("Forest_Sky_Night", new Color(0.2f, 0.25f, 0.36f), 0.4f, 0.02f, 0.2f);
+            theme.fogColor = new Color(0.07f, 0.09f, 0.13f);
+            theme.fogDensity = 0.02f;
+        }
+        theme.fog = true;
+
+        theme.innerTreeCount = 9;
+        theme.treeMinDistance = 3.6f;
+        theme.treeMaxCount = 200;
+
+        theme.extraLayer = Layer("Terrain_Layer6_Moss", 0.3f);
+        theme.extraAmount = 0.7f;
+
+        // 바위 고리 사이사이 쓰러진 통나무 · 뿌리 (같은 크기 규칙으로 섞임)
+        theme.wallRocks = Concat(set.wallRocks,
+            Prefabs("Stumps Roots and Branches/Prefabs Moss Cover/prefab_{0}.prefab", "dead_log_01_Moss", "dead_log_03_Moss", "beech_old_roots_01_Moss"));
+    }
+
+    static Material SkyMaterial(string name, Color tint, float thickness, float sunSize, float exposure)
+    {
+        string path = $"{LookFolder}/{name}.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null)
+        {
+            mat = new Material(Shader.Find("Skybox/Procedural")) { name = name };
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        mat.SetFloat("_SunDisk", 2f);
+        mat.SetFloat("_SunSize", sunSize);
+        mat.SetFloat("_SunSizeConvergence", 6f);
+        mat.SetFloat("_AtmosphereThickness", thickness);
+        mat.SetColor("_SkyTint", tint);
+        mat.SetColor("_GroundColor", new Color(0.3f, 0.3f, 0.27f));
+        mat.SetFloat("_Exposure", exposure); // 하늘 = 주변광 → 그늘이 새까맣지 않게
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    // 분위기별 색보정. 낮 값은 구역 1에서 확인한 값 그대로
+    static VolumeProfile LookProfile(Mood mood)
+    {
+        string path = $"{LookFolder}/Forest_Volume{(mood == Mood.Day ? "" : "_" + mood)}.asset";
+        var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(path);
+        if (profile == null)
+        {
+            profile = ScriptableObject.CreateInstance<VolumeProfile>();
+            AssetDatabase.CreateAsset(profile, path);
+        }
+
+        // 팩 데모 씬 값 참고: 채도는 거의 그대로, 대비 13, 밝은 쪽(gain)을 올려 숲이 칙칙하지 않게
+        float exposure = 0.65f, contrast = 10f, saturation = -3f, temperature = -5f, bloomIntensity = 0.45f, vignetteIntensity = 0.22f;
+        float gamma = 0.04f, gain = 0.1f;
+        Vector4 shadows = new Vector4(0.92f, 1f, 1.06f, 0.04f), highlights = new Vector4(1.06f, 1f, 0.9f, 0f);
+        if (mood == Mood.Dusk)
+        {
+            exposure = 0.75f; saturation = 0f; temperature = 8f; gamma = 0.06f;
+            shadows = new Vector4(0.95f, 0.94f, 1.08f, 0.1f);
+            highlights = new Vector4(1.1f, 0.98f, 0.85f, 0f);
+        }
+        else if (mood == Mood.Night)
+        {
+            exposure = 0.45f; contrast = 12f; saturation = -14f; temperature = -10f; bloomIntensity = 0.6f; vignetteIntensity = 0.3f; // 너무 밝아 낮처럼 보임 → 낮춤
+            gamma = 0.06f; gain = 0.08f;
+            shadows = new Vector4(0.9f, 0.95f, 1.1f, 0.08f); // 적 실루엣만 보일 만큼 그늘을 들어 올림
+            highlights = new Vector4(1f, 1f, 1f, 0f);
+        }
+
+        Get<Tonemapping>(profile).mode.Override(TonemappingMode.ACES);
+        var color = Get<ColorAdjustments>(profile);
+        color.postExposure.Override(exposure);
+        color.contrast.Override(contrast);
+        color.saturation.Override(saturation);
+        color.colorFilter.Override(new Color(1f, 0.98f, 0.94f));
+        var white = Get<WhiteBalance>(profile);
+        white.temperature.Override(temperature);
+        white.tint.Override(-4f);
+        var smh = Get<ShadowsMidtonesHighlights>(profile);
+        smh.shadows.Override(shadows);       // 그늘은 차갑게
+        smh.highlights.Override(highlights);
+        var lgg = Get<LiftGammaGain>(profile);
+        lgg.gamma.Override(new Vector4(1f, 1f, 1f, gamma));
+        lgg.gain.Override(new Vector4(1f, 1f, 1f, gain));
+        var bloom = Get<Bloom>(profile);
+        bloom.threshold.Override(1.1f);
+        bloom.intensity.Override(bloomIntensity);
+        bloom.scatter.Override(0.6f);
+        var vignette = Get<Vignette>(profile);
+        vignette.intensity.Override(vignetteIntensity);
+        vignette.smoothness.Override(0.45f);
+
+        EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
+        return profile;
+    }
+
+    // 프로필 안 효과는 서브 에셋으로 저장해야 다시 열어도 남음
+    static T Get<T>(VolumeProfile profile) where T : VolumeComponent
+    {
+        if (profile.TryGet(out T c)) return c;
+        c = profile.Add<T>(true);
+        c.name = typeof(T).Name;
+        AssetDatabase.AddObjectToAsset(c, profile);
+        return c;
+    }
+
+    static void EnsureLookVolume(ZoneTheme theme, Mood mood)
+    {
+        GameObject root = GameObject.Find(theme.zoneName);
+        if (root == null) return;
+        Transform t = root.transform.Find(LookName);
+        GameObject go = t != null ? t.gameObject : new GameObject(LookName, typeof(Volume), typeof(ZoneLookVolume));
+        go.transform.SetParent(root.transform, false);
+        go.transform.localPosition = Vector3.zero;
+
+        var volume = go.GetComponent<Volume>();
+        volume.isGlobal = true;
+        volume.priority = 5f; // 기본 전역 볼륨(0) 위, 궁극기 연출(200) 아래
+        volume.sharedProfile = LookProfile(mood);
+        var look = go.GetComponent<ZoneLookVolume>();
+        if (look == null) look = go.AddComponent<ZoneLookVolume>();
+        var so = new SerializedObject(look);
+        so.FindProperty("radius").floatValue = theme.wallRadius + 6f;
+        so.FindProperty("blend").floatValue = 15f;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
     [MenuItem("Tools/Map/Forest Pack/Restore Toon Themes")]
     static void Restore()
     {
@@ -101,6 +384,9 @@ public static class ForestPackSetup
             if (backup == null || theme == null) continue;
             EditorUtility.CopySerialized(backup, theme);
             EditorUtility.SetDirty(theme);
+            GameObject root = GameObject.Find(theme.zoneName); // 숲 후처리 볼륨도 치움
+            Transform look = root != null ? root.transform.Find(LookName) : null;
+            if (look != null) Object.DestroyImmediate(look.gameObject);
             AssetDatabase.SaveAssets();
             EditorApplication.ExecuteMenuItem(menu);
             restored++;
@@ -121,7 +407,7 @@ public static class ForestPackSetup
         var set = Load();
         for (int i = from; i < to; i++)
         {
-            if (PrepareTheme(Zones[i].theme, set) == null) continue; // [변경] 백업 · 교체를 다른 씬 메뉴와 공용으로
+            if (PrepareTheme(Zones[i].theme, set) == null) continue; // 백업 · 교체를 다른 씬 메뉴와 공용으로
             EditorApplication.ExecuteMenuItem(Zones[i].menu); // 이 구역만 다시 생성 (웨이브 · 직접 배치한 오브젝트는 유지)
         }
         EnsureWind();

@@ -30,9 +30,14 @@ MonoBehaviour:
   hillHeight: 10
   hillNoise: 4
   hillWidth: 22
+  hillRoughness: 1
+  pathMeander: 7
+  corridorFade: 11
   groundLayer: {fileID: 8574412962073106934, guid: 36273d67e33888e4bbc83a3981f39243, type: 2}
   arenaLayer: {fileID: 8574412962073106934, guid: 0e6bd9ceeb5bf204c814c5ee7afd2c81, type: 2}
   roadLayer: {fileID: 8574412962073106934, guid: ef0b183765135b64d80adee5c961998b, type: 2}
+  extraLayer: {fileID: 8574412962073106934, guid: db7bfdeb004c35a45baa5a40a7787b7f, type: 2}
+  extraAmount: 0.7
   wallRocks:
   - {fileID: 8745562623447073471, guid: 244fe7240ba55ae4aab622581df24828, type: 3}
   - {fileID: 1236898795652179981, guid: 4de5798c58a725e45b59a64a9cbae3d8, type: 3}
@@ -49,6 +54,9 @@ MonoBehaviour:
   - {fileID: 3218859338934444687, guid: febdc5bf87c1e6947ade6bc58d6b3d42, type: 3}
   - {fileID: 7775791737395211612, guid: 6e2f2295e776fcc45879fa27889dfbef, type: 3}
   - {fileID: 6608502843660117147, guid: 5268ba3c890b23d4f9b7c386790dc252, type: 3}
+  - {fileID: 6624766793370837317, guid: c97a2fa2e2dc11843ba810cffa4df640, type: 3}
+  - {fileID: 646326740325627895, guid: 476ad42ccc496c844ae5bc28eec4e2cc, type: 3}
+  - {fileID: 4832974873636329802, guid: 654ec8a6516083e41b6096fd509d3342, type: 3}
   wallRockSize: {x: 5, y: 8.5}
   wallRockSpacing: 0.5
   innerRocks:
@@ -67,8 +75,9 @@ MonoBehaviour:
   - {fileID: 1653678598776248653, guid: 987094f792fe9f946b536b171a0114c1, type: 3}
   - {fileID: 1008656033906581803, guid: 47a34fcf711f1d54a9e98658458da727, type: 3}
   treeHeight: {x: 14, y: 22}
-  treeMinDistance: 4.5
-  treeMaxCount: 160
+  treeMinDistance: 3.6
+  treeMaxCount: 200
+  innerTreeCount: 9
   arenaCover:
   - {fileID: 8632977291124583399, guid: 9ff96c23a39dbd84ba03d2b381dd8e57, type: 3}
   - {fileID: 6610836305396197052, guid: 6b3546d09bf439c41ad23f17e6092814, type: 3}
@@ -110,12 +119,12 @@ MonoBehaviour:
   - {fileID: 7566276046555049618, guid: b2e75757887dfab449c921a7a25078b1, type: 3}
   pathStoneSize: 1.1
   pathStoneSpacing: 3.2
-  skybox: {fileID: 2100000, guid: 9873fbde6fe03504a9da2612241c5d71, type: 2}
+  skybox: {fileID: 2100000, guid: 5bd7c6362bf6d4842a395ead1516ef69, type: 2}
   fog: 1
-  fogColor: {r: 0.72, g: 0.8, b: 0.82, a: 1}
-  fogDensity: 0.008
-  sunColor: {r: 1, g: 0.94, b: 0.82, a: 1}
-  sunEuler: {x: 45, y: -35, z: 0}
+  fogColor: {r: 0.56, g: 0.62, b: 0.6, a: 1}
+  fogDensity: 0.014
+  sunColor: {r: 1, g: 0.9, b: 0.74, a: 1}
+  sunEuler: {x: 38, y: -40, z: 0}
   groundParticles:
   - {fileID: 159832, guid: a838e4fa071a15f49b2f897cccaa5c90, type: 3}
   groundParticleCount: 6

@@ -29,9 +29,15 @@ public class ZoneTheme : ScriptableObject
     public float hillHeight = 10f;
     public float hillNoise = 4f;
     public float hillWidth = 22f;
+    // [변경] 자연스러운 지형: 공터 가장자리 · 언덕 높이 · 폭을 노이즈로 흔들고(0 = 예전 매끈한 고리), 문 밖 길을 S자로 굽힘(m)
+    public float hillRoughness = 0f;
+    public float pathMeander = 0f;
+    public float corridorFade = 6f; // 길 양옆 비탈 폭 (클수록 완만 · 길가는 투명 벽이 막음)
     public TerrainLayer groundLayer;
     public TerrainLayer arenaLayer;
     public TerrainLayer roadLayer;
+    public TerrainLayer extraLayer; // 언덕 · 바깥 땅에 얼룩처럼 섞는 4번째 질감 (이끼 등)
+    public float extraAmount = 0f;
 
     // 크기는 프리팹 원본 크기와 상관없이 이 범위로 맞춤 (바위는 가장 긴 변, 나무는 높이 기준)
     [Header("Wall Rocks")]
@@ -49,13 +55,14 @@ public class ZoneTheme : ScriptableObject
     public Vector2 treeHeight = new Vector2(9f, 16f);
     public float treeMinDistance = 4.5f;
     public int treeMaxCount = 220;
+    public int innerTreeCount = 0; // 전투 공간과 벽 사이에 심는 큰 나무 (공터 위로 가지가 덮임)
 
     [Header("Ground Cover")]
     public GameObject[] arenaCover;
     public int arenaCoverCount = 40;
     public GameObject[] outerCover;
     public int outerCoverCount = 80;
-    public float outerCoverReach = 10f; // [변경] 벽 바깥 덤불을 심는 띠 폭 (실사 숲은 언덕까지 넓게)
+    public float outerCoverReach = 10f; // 벽 바깥 덤불을 심는 띠 폭 (실사 숲은 언덕까지 넓게)
 
     // 아레나 바깥 대각선 네 곳에 세우는 큰 구조물 (구역 3 폐사찰의 정자 등). 가장 긴 변 기준 크기
     [Header("Landmarks")]
