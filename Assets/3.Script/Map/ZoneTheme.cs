@@ -19,7 +19,7 @@ public class ZoneTheme : ScriptableObject
     // 문이 나는 방향 (던전 허브 · 갈래 방용). 본편 구역은 남 · 북 그대로
     public bool gateSouth = true, gateNorth = true, gateEast, gateWest;
 
-    // [변경] 난이도: 이 구역 웨이브 적의 체력 · 공격력 배율, 동시에 공격하는 적 수
+    // 난이도: 이 구역 웨이브 적의 체력 · 공격력 배율, 동시에 공격하는 적 수
     [Header("Difficulty")]
     public float strength = 1f;
     public int maxAttackers = 2;
@@ -55,6 +55,7 @@ public class ZoneTheme : ScriptableObject
     public int arenaCoverCount = 40;
     public GameObject[] outerCover;
     public int outerCoverCount = 80;
+    public float outerCoverReach = 10f; // [변경] 벽 바깥 덤불을 심는 띠 폭 (실사 숲은 언덕까지 넓게)
 
     // 아레나 바깥 대각선 네 곳에 세우는 큰 구조물 (구역 3 폐사찰의 정자 등). 가장 긴 변 기준 크기
     [Header("Landmarks")]

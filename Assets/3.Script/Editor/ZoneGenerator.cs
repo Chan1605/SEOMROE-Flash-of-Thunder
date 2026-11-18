@@ -318,6 +318,51 @@ public static class ZoneGenerator
         Debug.Log($"[ZoneGenerator] {theme.zoneName} 완료 · 벽 바위 {wallRocks}, 안쪽 바위 {innerRocks}, 나무 {trees}, 풀·덤불 {cover}, 돌길 {stones} (seed {theme.seed})");
     }
 
+    // [변경] 지형 높이 · 문 · 결계 · 벽 · 랜드마크는 그대로 두고 바위 · 나무 · 풀 · 돌길 · 파티클 묶음과 지형 질감만 다시 만듦
+    // 셋업 스크립트가 Generated 안의 결계 · 부활 지점을 다른 오브젝트에 연결해 둔 씬(던전 · 마을 · 수련장 · 연습장)용
+    public static bool RebuildProps(ZoneTheme theme)
+    {
+        GameObject root = GameObject.Find(theme.zoneName);
+        Transform generated = root != null ? root.transform.Find(GeneratedName) : null;
+        Terrain terrain = generated != null ? generated.GetComponentInChildren<Terrain>(true) : null;
+        if (terrain == null)
+        {
+            Debug.LogWarning($"[ZoneGenerator] {theme.zoneName}/Generated 지형이 없어 건너뜀");
+            return false;
+        }
+
+        rng = new System.Random(theme.seed);
+        boundsCache.Clear();
+        origin = theme.origin;
+
+        Undo.RegisterCompleteObjectUndo(terrain.terrainData, "Repaint Zone");
+        PaintLayers(theme, terrain.terrainData);
+        EditorUtility.SetDirty(terrain.terrainData);
+
+        int wallRocks = PlaceWallRocks(theme, Regroup(generated, "WallRocks"), terrain);
+        int innerRocks = PlaceInnerRocks(theme, Regroup(generated, "InnerRocks"), terrain);
+        int trees = PlaceTrees(theme, Regroup(generated, "Trees"), terrain);
+        int cover = PlaceCover(theme, Regroup(generated, "Cover"), terrain);
+        int stones = PlacePathStones(theme, Regroup(generated, "PathStones"), terrain);
+        PlaceParticles(theme, Regroup(generated, "Particles"), terrain);
+
+        EditorSceneManager.MarkSceneDirty(root.scene);
+        Debug.Log($"[ZoneGenerator] {theme.zoneName} 소품만 다시 생성 · 벽 바위 {wallRocks}, 안쪽 바위 {innerRocks}, 나무 {trees}, 풀·덤불 {cover}, 돌길 {stones}");
+        return true;
+    }
+
+    // 같은 이름 묶음을 지우고 같은 순서 자리에 빈 묶음을 새로 만듦
+    static Transform Regroup(Transform generated, string name)
+    {
+        Transform old = generated.Find(name);
+        int index = old != null ? old.GetSiblingIndex() : -1;
+        if (old != null) Undo.DestroyObjectImmediate(old.gameObject);
+        Transform group = Group(generated.gameObject, name);
+        Undo.RegisterCreatedObjectUndo(group.gameObject, "Rebuild Zone Props");
+        if (index >= 0) group.SetSiblingIndex(index);
+        return group;
+    }
+
     // ===== 지형 =====
     // 아레나와 문 앞 길은 평평하게, 벽 바깥은 언덕으로 솟아 "산 속 공터" 느낌
     static float Height(ZoneTheme t, float x, float z)
@@ -334,7 +379,7 @@ public static class ZoneGenerator
         float toEdge = t.terrainSize * 0.5f - Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
         h = Mathf.Lerp(SeamHeight, h, Mathf.Clamp01(toEdge / SeamBand));
 
-        float corridor = GateStrip(t, x, z, t.gateHalfWidth, 6f); // [변경] 열린 문 방향으로만 길을 냄
+        float corridor = GateStrip(t, x, z, t.gateHalfWidth, 6f); // 열린 문 방향으로만 길을 냄
         return h * (1f - corridor);
     }
 
@@ -400,7 +445,7 @@ public static class ZoneGenerator
             float r = Mathf.Sqrt(x * x + z * z);
 
             float arena = 1f - Mathf.Clamp01((r - (t.combatRadius - 1f)) / 3f);
-            float road = GateStrip(t, x, z, t.gateHalfWidth - 1f, 2f) * (1f - arena); // [변경]
+            float road = GateStrip(t, x, z, t.gateHalfWidth - 1f, 2f) * (1f - arena);
             float grass = Mathf.Max(0f, 1f - arena - road);
             float sum = arena + road + grass;
 
@@ -425,7 +470,7 @@ public static class ZoneGenerator
         {
             float a = (i + 0.5f) * Mathf.PI * 2f / segments;
             Vector3 pos = new Vector3(Mathf.Cos(a) * r, 3f, Mathf.Sin(a) * r);
-            if (InGate(t, pos, 0f)) continue; // [변경]
+            if (InGate(t, pos, 0f)) continue;
 
             var seg = new GameObject($"Wall_{i:00}");
             seg.transform.SetParent(wall.transform, false);
@@ -447,7 +492,7 @@ public static class ZoneGenerator
     }
 
     // 남쪽 입구, 북쪽 출구에 붉은 문 + 결계(콜라이더). 결계 열고 닫기는 ZoneArena 담당
-    // [변경] 동 · 서 문도 만들 수 있음 (Gate_East · Gate_West). 입구 = 남쪽(없으면 처음 찾은 문), 출구 = 남쪽 입구가 있을 때의 북쪽 문
+    // 동 · 서 문도 만들 수 있음 (Gate_East · Gate_West). 입구 = 남쪽(없으면 처음 찾은 문), 출구 = 남쪽 입구가 있을 때의 북쪽 문
     static (GameObject entrance, GameObject exit) BuildGates(ZoneTheme t, Transform parent, Terrain terrain)
     {
         Material gateMat = GetOrCreateMaterial("Zone_Gate", false, t.gateColor);
@@ -461,11 +506,11 @@ public static class ZoneGenerator
         return (north ?? east ?? west, null);
     }
 
-    // [변경] 입구 방향 (부활 위치 기준): 남쪽 문이 있으면 남, 없으면 처음 찾은 문
+    // 입구 방향 (부활 위치 기준): 남쪽 문이 있으면 남, 없으면 처음 찾은 문
     static Vector3 EntranceDir(ZoneTheme t) =>
         t.gateSouth ? Vector3.back : t.gateNorth ? Vector3.forward : t.gateEast ? Vector3.right : t.gateWest ? Vector3.left : Vector3.back;
 
-    // [변경] 핵심: 열린 문 방향의 길 띠 안이면 1 (가장자리 fade 폭만큼 부드럽게). 남북 문만 있으면 예전 계산과 같음
+    // 핵심: 열린 문 방향의 길 띠 안이면 1 (가장자리 fade 폭만큼 부드럽게). 남북 문만 있으면 예전 계산과 같음
     static float GateStrip(ZoneTheme t, float x, float z, float halfWidth, float fade)
     {
         float v = 0f;
@@ -487,7 +532,7 @@ public static class ZoneGenerator
         Vector3 basePos = dir * t.wallRadius;
         basePos.y = GroundY(terrain, origin + basePos);
         gate.transform.localPosition = basePos;
-        gate.transform.localRotation = Quaternion.LookRotation(dir, Vector3.up); // [변경] 동서 문은 옆으로 돌림
+        gate.transform.localRotation = Quaternion.LookRotation(dir, Vector3.up); // 동서 문은 옆으로 돌림
 
         float w = t.gateHalfWidth;
         Part(gate.transform, "Pillar_L", new Vector3(-(w + 0.4f), 2.75f, 0f), new Vector3(0.5f, 5.5f, 0.5f), gateMat, true);
@@ -505,7 +550,7 @@ public static class ZoneGenerator
     {
         var point = new GameObject("RespawnPoint");
         point.transform.SetParent(parent, false);
-        Vector3 dir = EntranceDir(t); // [변경] 입구가 동 · 서 · 북이어도 그 문 바깥
+        Vector3 dir = EntranceDir(t); // 입구가 동 · 서 · 북이어도 그 문 바깥
         Vector3 local = dir * (t.wallRadius + 3f);
         local.y = GroundY(terrain, origin + local) + 0.1f;
         point.transform.localPosition = local;
@@ -557,7 +602,7 @@ public static class ZoneGenerator
             Vector3 pos = new Vector3(Mathf.Cos(angle) * r, 0f, Mathf.Sin(angle) * r);
             angle += size * t.wallRockSpacing / t.wallRadius;
 
-            if (InGate(t, pos, 1.2f)) continue; // [변경]
+            if (InGate(t, pos, 1.2f)) continue;
             Spawn(Pick(t.wallRocks), parent, terrain, pos, size, false, size * 0.15f, true);
             count++;
         }
@@ -572,7 +617,7 @@ public static class ZoneGenerator
         for (int attempt = 0; attempt < t.innerRockCount * 10 && count < t.innerRockCount; attempt++)
         {
             Vector3 pos = RandomInRing(t.combatRadius + 0.5f, t.wallRadius - 1f);
-            if (InGate(t, pos, 1f)) continue; // [변경]
+            if (InGate(t, pos, 1f)) continue;
             Spawn(Pick(t.innerRocks), parent, terrain, pos, Range(t.innerRockSize), false, 0.1f, true);
             count++;
         }
@@ -593,7 +638,7 @@ public static class ZoneGenerator
             Vector3 pos = new Vector3(RangeF(-half, half), 0f, RangeF(-half, half));
             float r = new Vector2(pos.x, pos.z).magnitude;
             if (r < t.wallRadius + 2.5f) continue;
-            if (InGate(t, pos, 2.5f)) continue; // [변경]
+            if (InGate(t, pos, 2.5f)) continue;
             if (placed.Any(p => (p - pos).sqrMagnitude < minSqr)) continue;
 
             placed.Add(pos);
@@ -619,8 +664,8 @@ public static class ZoneGenerator
         {
             for (int attempt = 0; attempt < t.outerCoverCount * 5 && count < t.arenaCoverCount + t.outerCoverCount; attempt++)
             {
-                Vector3 pos = RandomInRing(t.wallRadius + 0.5f, t.wallRadius + 10f);
-                if (InGate(t, pos, 0.5f)) continue; // [변경]
+                Vector3 pos = RandomInRing(t.wallRadius + 0.5f, t.wallRadius + Mathf.Max(1f, t.outerCoverReach)); // 띠 폭을 테마에서
+                if (InGate(t, pos, 0.5f)) continue;
                 Spawn(Pick(t.outerCover), parent, terrain, pos, 0f, false, 0f, false);
                 count++;
             }
@@ -651,7 +696,7 @@ public static class ZoneGenerator
 
         int count = 0;
         float end = t.terrainSize * 0.5f - 6f;
-        var dirs = new List<Vector3>(); // [변경] 열린 문 방향마다 돌길
+        var dirs = new List<Vector3>(); // 열린 문 방향마다 돌길
         if (t.gateSouth) dirs.Add(Vector3.back);
         if (t.gateNorth) dirs.Add(Vector3.forward);
         if (t.gateEast) dirs.Add(Vector3.right);

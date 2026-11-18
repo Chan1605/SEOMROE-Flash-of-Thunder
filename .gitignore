@@ -80,3 +80,7 @@ desktop.ini
 /[Aa]ssets/Gizmos.meta
 /[Aa]ssets/_TerrainAutoUpgrade/
 /[Aa]ssets/_TerrainAutoUpgrade.meta
+
+# [변경] NatureManufacture Forest Environment (에셋스토어 유료, 약 4GB) - 저장소 · LFS에 올리지 않음. 다른 PC에선 Package Manager에서 다시 받고 URP 17.1 지원팩까지 Import
+/[Aa]ssets/NatureManufacture Assets/
+/[Aa]ssets/NatureManufacture Assets.meta
