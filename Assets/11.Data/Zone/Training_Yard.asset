@@ -131,6 +131,7 @@ MonoBehaviour:
   stairSize: 4
   stairYaw: 0
   bridges: []
+  placeBridges: 0
   bridgeSpan: 20
   bridgeClearance: 4
   pathStones:

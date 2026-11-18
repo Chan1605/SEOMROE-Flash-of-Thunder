@@ -135,6 +135,7 @@ MonoBehaviour:
   - {fileID: 1275777544054868, guid: 7e884fd1451c07a428c9f1909b0e9ff1, type: 3}
   - {fileID: 1646584322331726, guid: 132aeb3d0d143d043a97ffeede936510, type: 3}
   - {fileID: 2297988222817966686, guid: e77c0fa37e23c8f4a98378f53f8ddf3d, type: 3}
+  placeBridges: 0
   bridgeSpan: 20
   bridgeClearance: 4
   pathStones:

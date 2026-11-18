@@ -814,6 +814,20 @@ public static class ZoneGenerator
         terrain.heightmapPixelError = 1f;
         terrain.detailObjectDistance = t.detailDistance;
         terrain.detailObjectDensity = 1f;
+        PrepareForBakedLight(terrain); // [변경] 다시 생성해도 간접광 굽기 설정 유지
+    }
+
+    // [변경] 간접광(APV) 굽기용: 지형이 빛 반사에 참여(Contribute GI)하고, 받는 쪽은 라이트맵 대신 프로브로 → 굽기 빠르고 데이터 작음
+    // GPU 인스턴싱으로 지형 그리기 (드로우콜 감소)
+    public static void PrepareForBakedLight(Terrain terrain)
+    {
+        terrain.drawInstanced = true;
+        GameObjectUtility.SetStaticEditorFlags(terrain.gameObject,
+            GameObjectUtility.GetStaticEditorFlags(terrain.gameObject) | StaticEditorFlags.ContributeGI);
+        var so = new SerializedObject(terrain);
+        SerializedProperty receive = so.FindProperty("m_ReceiveGI");
+        if (receive != null) receive.intValue = (int)ReceiveGI.LightProbes;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     // 핵심: 지형 디테일 풀. 공터 가운데 · 길 · 가파른 곳은 비우고, 공터 가장자리부터 바깥으로 무리 지어 깔림
@@ -1061,7 +1075,7 @@ public static class ZoneGenerator
     // 프리팹마다 긴 축(X/Z) · 피벗이 달라서 경계 상자로 방향 · 중심 · 바닥을 맞춤. 장식이라 콜라이더 뗌
     static void PlaceBridges(ZoneTheme t, Transform parent, Terrain terrain)
     {
-        if (!t.placeBridges || t.bridges == null || t.bridges.Length == 0 || !t.gateNorth) return; // [변경] 켜야 놓음
+        if (!t.placeBridges || t.bridges == null || t.bridges.Length == 0 || !t.gateNorth) return; // 켜야 놓음
         GameObject prefab = Pick(t.bridges);
         if (prefab == null) return;
 

@@ -203,7 +203,7 @@ public static class ForestPackSetup
         // 본편만 지형까지 다시 만듦 → 자연스러운 언덕 · S자 길 · 완만한 길가 (다른 씬은 소품만 다시 만들어서 지형 값은 안 바꿈)
         theme.pathMeander = 7f;
         theme.bridges = set.bridges; // 본편만: 굽은 길 위 나무다리 후보 (프리팹 보존용)
-        theme.placeBridges = false;  // [변경] 사용자: 다리 모양이 어색해 보류 → 다시 생성해도 안 놓음 (테마에서 켜면 놓임)
+        theme.placeBridges = false;  // 사용자: 다리 모양이 어색해 보류 → 다시 생성해도 안 놓음 (테마에서 켜면 놓임)
         theme.corridorFade = 11f;
         EditorUtility.SetDirty(theme);
         AssetDatabase.SaveAssets();
@@ -240,7 +240,7 @@ public static class ForestPackSetup
         }
         else // 밤: 카툰 남색 하늘 대신 어두운 사실적 밤하늘 + 짙은 남색 안개 (달빛 색 · 각도는 원래 테마)
         {
-            theme.skybox = SkyMaterial("Forest_Sky_Night", new Color(0.2f, 0.25f, 0.36f), 0.4f, 0.02f, 2.65f); // [변경] 사용자 조정값 (하늘 노출 → 2.65)
+            theme.skybox = SkyMaterial("Forest_Sky_Night", new Color(0.2f, 0.25f, 0.36f), 0.4f, 0.02f, 2.65f); // 사용자 조정값 (하늘 노출 → 2.65)
             theme.fogColor = new Color(0.07f, 0.09f, 0.13f);
             theme.fogDensity = 0.02f;
         }
@@ -307,7 +307,7 @@ public static class ForestPackSetup
         else if (mood == Mood.Night)
         {
             // 사용자 조정값 (던전 확인)
-            exposure = 1f; contrast = 12f; saturation = -14f; temperature = -10f; bloomIntensity = 0.6f; vignetteIntensity = 0.3f; // [변경] 사용자 조정값: 노출 0.7 → 1
+            exposure = 1f; contrast = 12f; saturation = -14f; temperature = -10f; bloomIntensity = 0.6f; vignetteIntensity = 0.3f; // 사용자 조정값: 노출 0.7 → 1
             gamma = 0.1f; gain = 0.08f;
             shadows = new Vector4(0.818f, 0.864f, 1f, 0.08f); // 그늘은 푸르게 · 적 실루엣만 보일 만큼 들어 올림
             highlights = new Vector4(1f, 1f, 1f, 0f);
@@ -718,6 +718,59 @@ public static class ForestPackSetup
         go.GetComponent<Renderer>().sharedMaterial = mat;
         if (!collider) Object.DestroyImmediate(go.GetComponent<Collider>());
         return go;
+    }
+
+    // [변경] 간접광(APV) 굽기 준비 (지금 열린 씬): 해 Mixed · 지형 Contribute GI + 프로브로 받기 · 전역 APV 볼륨 · 씬 전용 라이팅 설정
+    // 굽기는 Lighting 창 Adaptive Probe Volumes 탭에서 Min Probe Spacing을 정한 뒤 Generate Lighting
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/Prepare Indirect Light (Current Scene)")]
+    static void PrepareIndirectLight()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        var scene = EditorSceneManager.GetActiveScene();
+
+        int lights = 0;
+        foreach (Light light in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            Undo.RecordObject(light, "Mixed Light");
+            light.lightmapBakeType = LightmapBakeType.Mixed;
+            lights++;
+        }
+
+        int terrains = 0;
+        foreach (Terrain terrain in Object.FindObjectsByType<Terrain>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            ZoneGenerator.PrepareForBakedLight(terrain);
+            terrains++;
+        }
+
+        if (Object.FindAnyObjectByType<ProbeVolume>(FindObjectsInactive.Include) == null)
+        {
+            var go = new GameObject("Adaptive Probe Volume");
+            go.AddComponent<ProbeVolume>().mode = ProbeVolume.Mode.Global;
+            Undo.RegisterCreatedObjectUndo(go, "APV");
+        }
+
+        string folder = System.IO.Path.GetDirectoryName(scene.path).Replace('\\', '/');
+        string settingsPath = $"{folder}/{scene.name}_Lighting.lighting";
+        var settings = AssetDatabase.LoadAssetAtPath<LightingSettings>(settingsPath);
+        if (settings == null)
+        {
+            settings = new LightingSettings { name = scene.name + "_Lighting" };
+            AssetDatabase.CreateAsset(settings, settingsPath);
+        }
+        settings.realtimeGI = false;
+        settings.bakedGI = true;
+        settings.mixedBakeMode = MixedLightingMode.IndirectOnly;
+        settings.lightmapper = LightingSettings.Lightmapper.ProgressiveGPU;
+        settings.lightmapResolution = 2f;   // 라이트맵을 쓰는 물체가 거의 없게 해 둠 (지형은 프로브로 받음)
+        settings.lightmapMaxSize = 1024;
+        EditorUtility.SetDirty(settings);
+        Lightmapping.lightingSettings = settings;
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[ForestPack] {scene.name} 간접광 준비 · 해 {lights}개 Mixed · 지형 {terrains}개 · APV 전역 볼륨 → Lighting 창에서 Min Probe Spacing 정하고 Generate Lighting");
     }
 
     // 그래픽 품질 (목표 90fps 이상): 그림자 거리 40 → 60 · 캐스케이드 2 → 3. 직접 바꾼 값이 있으면 그대로 둠
