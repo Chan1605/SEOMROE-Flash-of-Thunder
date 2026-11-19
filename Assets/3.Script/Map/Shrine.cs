@@ -53,7 +53,7 @@ public class Shrine : MonoBehaviour
         Vector3 d = player.position - transform.position;
         d.y = 0f;
         bool close = d.sqrMagnitude <= interactRange * interactRange && (health == null || !health.IsDead);
-        bool fighting = ZoneArena.Fighting != null; // [변경] 전투 중(시련 포함)엔 쉴 수 없음
+        bool fighting = ZoneArena.Fighting != null; // 전투 중(시련 포함)엔 쉴 수 없음
         bool near = close && !fighting;
         if (near != inRange)
         {
@@ -64,7 +64,7 @@ public class Shrine : MonoBehaviour
         if (!close || GamePause.IsPaused || menu.IsOpen) return;
         Keyboard kb = Keyboard.current;
         if (kb == null || !kb.eKey.wasPressedThisFrame) return;
-        if (fighting) // [변경] 눌러도 회복 · 스킬트리 없이 안내만
+        if (fighting) // 눌러도 회복 · 스킬트리 없이 안내만
         {
             DamageEvents.RaiseLabel(transform.position + Vector3.up * 2.2f, "전투 중에는 쉴 수 없다", new Color(1f, 0.6f, 0.4f));
             return;
@@ -80,16 +80,17 @@ public class Shrine : MonoBehaviour
     void BuildLook()
     {
         var mat = new Material(Shader.Find("Sprites/Default"));
+        var sparkMat = new Material(mat) { mainTexture = SparkTexture() }; // [변경] 네모 → 둥근 빛 점
 
-        // 위로 오르는 불티
+        // 위로 오르는 불티: 움직이는 방향으로 살짝 늘어난 둥근 점 (불똥 꼬리)
         var ps = new GameObject("Embers").AddComponent<ParticleSystem>();
         ps.transform.SetParent(transform, false);
-        ps.transform.localPosition = new Vector3(0f, 1.5f, 0f);
+        ps.transform.localPosition = new Vector3(0f, 1.55f, 0f);
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         ParticleSystem.MainModule main = ps.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.5f, 2.8f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.6f, 1.4f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.055f);
         main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.45f, 0.15f), new Color(1f, 0.8f, 0.4f));
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.useUnscaledTime = true;
@@ -111,7 +112,10 @@ public class Shrine : MonoBehaviour
         ParticleSystem.EmissionModule em = ps.emission;
         em.rateOverTime = 14f;
         var pr = ps.GetComponent<ParticleSystemRenderer>();
-        pr.sharedMaterial = mat;
+        pr.sharedMaterial = sparkMat;
+        pr.renderMode = ParticleSystemRenderMode.Stretch;
+        pr.velocityScale = 0.06f;
+        pr.lengthScale = 1.5f;
         pr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         ps.Play();
 
@@ -131,6 +135,27 @@ public class Shrine : MonoBehaviour
             float a = i * Mathf.PI * 2f / Segments;
             ring.SetPosition(i, new Vector3(Mathf.Cos(a) * interactRange, 0.06f, Mathf.Sin(a) * interactRange));
         }
+    }
+
+    // 가운데가 밝고 가장자리로 부드럽게 사라지는 원 (모든 화톳불이 하나를 같이 씀)
+    static Texture2D spark;
+
+    static Texture2D SparkTexture()
+    {
+        if (spark != null) return spark;
+        const int N = 32;
+        spark = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "Spark" };
+        var pixels = new Color32[N * N];
+        for (int y = 0; y < N; y++)
+        for (int x = 0; x < N; x++)
+        {
+            float d = new Vector2(x - (N - 1) * 0.5f, y - (N - 1) * 0.5f).magnitude / (N * 0.5f);
+            float a = Mathf.Pow(Mathf.Clamp01(1f - d), 2f);
+            pixels[y * N + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+        }
+        spark.SetPixels32(pixels);
+        spark.Apply();
+        return spark;
     }
 
     void OnDrawGizmosSelected()

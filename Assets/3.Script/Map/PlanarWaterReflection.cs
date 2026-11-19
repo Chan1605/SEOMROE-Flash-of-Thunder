@@ -17,6 +17,28 @@ public class PlanarWaterReflection : MonoBehaviour
     static readonly int ReflectionOn = Shader.PropertyToID("_SeomroePlanarOn");
     static PlanarWaterReflection owner; // 같은 프레임엔 가장 가까운 연못 하나만 그림
 
+    // [변경] 발밑 물 튐용: 씬의 연못 목록 + 위치가 물 위인지
+    public static readonly System.Collections.Generic.List<PlanarWaterReflection> All = new System.Collections.Generic.List<PlanarWaterReflection>();
+
+    public static bool FindWater(Vector3 position, out float surfaceY)
+    {
+        foreach (PlanarWaterReflection w in All)
+        {
+            Vector3 c = w.transform.position;
+            float radius = w.transform.lossyScale.x / 1.45f; // 물면 원판은 연못 반지름의 1.45배로 깔림
+            Vector2 d = new Vector2(position.x - c.x, position.z - c.z);
+            if (d.magnitude < radius && position.y < c.y + 0.35f)
+            {
+                surfaceY = c.y;
+                return true;
+            }
+        }
+        surfaceY = 0f;
+        return false;
+    }
+
+    void OnEnable() => All.Add(this);
+
     Renderer surface;
     Camera reflectionCamera;
     RenderTexture target;
@@ -25,6 +47,7 @@ public class PlanarWaterReflection : MonoBehaviour
 
     void OnDisable()
     {
+        All.Remove(this);
         if (owner == this) { owner = null; Shader.SetGlobalFloat(ReflectionOn, 0f); }
         if (reflectionCamera != null) Destroy(reflectionCamera.gameObject);
         if (target != null) { target.Release(); Destroy(target); }

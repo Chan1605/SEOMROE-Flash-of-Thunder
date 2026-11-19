@@ -31,6 +31,8 @@ public class PlayerFootsteps : MonoBehaviour
         runSpeed = Mathf.Max(0.1f, fullVolumeSpeed);
     }
 
+    public event System.Action<Vector3, float> Planted; // [변경] 발 위치 · 빠르기(0~1) → 발밑 먼지 · 물 튐
+
     void Start()
     {
         animator = GetComponentInChildren<Animator>();
@@ -73,7 +75,11 @@ public class PlayerFootsteps : MonoBehaviour
             else if (lifted[i] && h < lowest[i] + PlantHeight)
             {
                 lifted[i] = false;
-                if (moving && Time.time - lastStepTime >= MinInterval) Play();
+                if (moving && Time.time - lastStepTime >= MinInterval)
+                {
+                    Play();
+                    Planted?.Invoke(feet[i].position, Mathf.Clamp01(speed / runSpeed));
+                }
             }
         }
     }
