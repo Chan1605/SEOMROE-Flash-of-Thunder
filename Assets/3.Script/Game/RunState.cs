@@ -5,8 +5,8 @@ using UnityEngine.SceneManagement;
 // 씬을 넘어갈 때 이어받는 진행 상태 (한 판 동안만, 저장 파일 없음)
 //  - 스킬트리: 남은 포인트 · 해금 목록 → SkillTreeMenu.Awake가 초기화 대신 복원, 수련 패시브는 Start에서 다시 적용
 //  - 레벨 · 경험치 · 추가 스탯 → 새 씬이 로드되면 PlayerStats에 바로 넣음 (레벨업 이벤트 없이)
-//  - [변경] 표시(flag): 한 판 동안 남길 표시 (예: 던전 클리어 → 본편의 던전 입구 끔)
-//  - [변경] SpawnAt: 도착 씬에서 플레이어를 옮길 오브젝트 경로 (던전 → 본편 보스 구역 입구)
+//  - 표시(flag): 한 판 동안 남길 표시 (예: 던전 클리어 → 본편의 던전 입구 끔)
+//  - SpawnAt: 도착 씬에서 플레이어를 옮길 오브젝트 경로 (던전 → 본편 보스 구역 입구)
 // SceneTransition.Load가 떠나기 직전에 Capture. 에디터에서 씬을 바로 플레이하면 비어 있어 예전과 같음
 public static class RunState
 {
@@ -18,7 +18,7 @@ public static class RunState
     static readonly HashSet<string> flags = new HashSet<string>();
 
     public static string SpawnAt { get; set; }
-    public static float UltimateGauge { get; private set; } // [변경] 궁극기 게이지 (PlayerUltimate가 Start에서 읽음)
+    public static float UltimateGauge { get; private set; } // 궁극기 게이지 (PlayerUltimate가 Start에서 읽음)
     public static bool HasFlag(string flag) => flags.Contains(flag);
     public static void SetFlag(string flag) => flags.Add(flag);
 
@@ -35,7 +35,7 @@ public static class RunState
     {
         hasSkills = hasStats = false;
         unlocked.Clear();
-        UltimateGauge = 0f; // [변경]
+        UltimateGauge = 0f;
         flags.Clear();
     }
 
@@ -49,7 +49,7 @@ public static class RunState
             unlocked.AddRange(SkillTree.Unlocked);
         }
 
-        PlayerUltimate ultimate = Object.FindAnyObjectByType<PlayerUltimate>(); // [변경]
+        PlayerUltimate ultimate = Object.FindAnyObjectByType<PlayerUltimate>();
         UltimateGauge = ultimate != null ? ultimate.Gauge : 0f;
 
         PlayerStats stats = Object.FindAnyObjectByType<PlayerStats>();
@@ -61,6 +61,57 @@ public static class RunState
             bonus = stats.Bonus;
         }
     }
+
+    // [변경] 저장 파일(SaveGame)용: 지금 상태를 JSON으로 / JSON에서 되살림
+    [System.Serializable]
+    class Saved
+    {
+        public int version = 1;
+        public bool skills;
+        public int points;
+        public int[] unlocked;
+        public bool stats;
+        public int level, xp;
+        public Vector4 bonus;
+        public string[] flags;
+        public float ultimate;
+    }
+
+    public static string ToJson()
+    {
+        var s = new Saved
+        {
+            skills = hasSkills,
+            points = points,
+            unlocked = unlocked.ConvertAll(id => (int)id).ToArray(),
+            stats = hasStats,
+            level = level,
+            xp = xp,
+            bonus = bonus,
+            flags = new List<string>(flags).ToArray(),
+            ultimate = UltimateGauge,
+        };
+        return JsonUtility.ToJson(s);
+    }
+
+    public static bool FromJson(string json)
+    {
+        Saved s = string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<Saved>(json);
+        if (s == null) return false;
+        Clear();
+        hasSkills = s.skills;
+        points = s.points;
+        if (s.unlocked != null) foreach (int id in s.unlocked) unlocked.Add((SkillId)id);
+        hasStats = s.stats;
+        level = s.level;
+        xp = s.xp;
+        bonus = s.bonus;
+        if (s.flags != null) foreach (string f in s.flags) flags.Add(f);
+        UltimateGauge = s.ultimate;
+        return true;
+    }
+
+    public static int SavedLevel => hasStats ? level : 1;
 
     // SkillTreeMenu.Awake에서 호출. 복원했으면 true (그땐 Activate로 초기화하지 않음)
     public static bool TryRestoreSkills()

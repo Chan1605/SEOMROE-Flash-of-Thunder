@@ -17,7 +17,25 @@ public class PlanarWaterReflection : MonoBehaviour
     static readonly int ReflectionOn = Shader.PropertyToID("_SeomroePlanarOn");
     static PlanarWaterReflection owner; // 같은 프레임엔 가장 가까운 연못 하나만 그림
 
-    // [변경] 발밑 물 튐용: 씬의 연못 목록 + 위치가 물 위인지
+    // [변경] 이 컴포넌트가 생기기 전에 만든 연못(예: InGame 구역 2)에도 실행 중 자동으로 붙임 → 반사 · 물 발소리 · 물 튐이 모든 연못에서 동작
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void Install()
+    {
+        AttachToWater();
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += (scene, mode) => AttachToWater();
+    }
+
+    static void AttachToWater()
+    {
+        foreach (MeshRenderer r in FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+        {
+            Material m = r.sharedMaterial;
+            if (m == null || m.shader == null || m.shader.name != "SEOMROE/Water") continue;
+            if (r.GetComponent<PlanarWaterReflection>() == null) r.gameObject.AddComponent<PlanarWaterReflection>();
+        }
+    }
+
+    // 발밑 물 튐용: 씬의 연못 목록 + 위치가 물 위인지
     public static readonly System.Collections.Generic.List<PlanarWaterReflection> All = new System.Collections.Generic.List<PlanarWaterReflection>();
 
     public static bool FindWater(Vector3 position, out float surfaceY)

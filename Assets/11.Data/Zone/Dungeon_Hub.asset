@@ -15,7 +15,7 @@ MonoBehaviour:
   zoneName: Dungeon_Hub
   seed: 379
   origin: {x: 0, y: 0, z: 0}
-  displayNumber: "\uB358\uC804"
+  displayNumber: "\uC678\uACFD"
   displayName: "\uB1CC\uC6B4 \uD611\uACE1"
   combatRadius: 15
   wallRadius: 19

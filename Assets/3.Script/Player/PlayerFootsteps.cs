@@ -11,8 +11,15 @@ public class PlayerFootsteps : MonoBehaviour
     const float MinInterval = 0.12f;  // 두 발이 거의 동시에 닿아도 한 번만
 
     AudioClip[] clips;
-    AudioClip[] waterClips; // [변경] 연못 안 발소리 (Resources/Audio/Footsteps/water_step_*)
+    AudioClip[] waterClips; // 연못 안 발소리 (Resources/Audio/Footsteps/water_step_*)
+    AudioClip[] liftClips;  // 물에서 발을 뺄 때 쓸리는 소리 (water_lift_*) → 디딤 · 뺌이 번갈아 들려 물을 헤치고 걷는 느낌
     int lastWaterClip = -1;
+    AudioSource wadeSource;
+    // [변경] 젖은 땅(비 오는 씬): 기본 발소리 위에 얇은 '찰박'을 이 크기로 얹음. 0이면 끔 (DungeonWeather가 켜고 끔)
+    public static float WetAmount;
+    AudioClip[] wetClips;
+    const float WaterVolume = 1.15f;
+    const float LiftVolume = 0.55f;
     float volume, runSpeed;
     Vector2 pitch;
     Animator animator;
@@ -44,7 +51,15 @@ public class PlayerFootsteps : MonoBehaviour
             feet[0] = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
             feet[1] = animator.GetBoneTransform(HumanBodyBones.RightFoot);
         }
-        waterClips = System.Array.FindAll(Resources.LoadAll<AudioClip>("Audio/Footsteps"), c => c.name.StartsWith("water_step"));
+        AudioClip[] all = Resources.LoadAll<AudioClip>("Audio/Footsteps");
+        waterClips = System.Array.FindAll(all, c => c.name.StartsWith("water_step"));
+        liftClips = System.Array.FindAll(all, c => c.name.StartsWith("water_lift"));
+        wetClips = System.Array.FindAll(all, c => c.name.StartsWith("wet_splash"));
+        var wade = new GameObject("Sfx_Wade");
+        wade.transform.SetParent(transform, false);
+        wadeSource = wade.AddComponent<AudioSource>();
+        wadeSource.playOnAwake = false;
+        wadeSource.spatialBlend = 0f;
         var go = new GameObject("Sfx_Footsteps");
         go.transform.SetParent(transform, false);
         source = go.AddComponent<AudioSource>();
@@ -74,7 +89,11 @@ public class PlayerFootsteps : MonoBehaviour
             if (feet[i] == null) continue;
             float h = FootHeight(i);
             lowest[i] = Mathf.Min(lowest[i] + dt * 0.05f, h); // 자세가 바뀌어도 천천히 따라가게
-            if (h > lowest[i] + LiftHeight) lifted[i] = true;
+            if (h > lowest[i] + LiftHeight)
+            {
+                if (!lifted[i] && moving) Lift(feet[i].position);
+                lifted[i] = true;
+            }
             else if (lifted[i] && h < lowest[i] + PlantHeight)
             {
                 lifted[i] = false;
@@ -99,6 +118,21 @@ public class PlayerFootsteps : MonoBehaviour
         if (set[i] == null) return;
         float pace = Mathf.Lerp(0.45f, 1f, Mathf.Clamp01(speed / runSpeed));
         source.pitch = Random.Range(pitch.x, pitch.y);
-        source.PlayOneShot(set[i], volume * pace * AudioOptions.SfxVolume);
+        source.PlayOneShot(set[i], volume * pace * (water ? WaterVolume : 1f) * AudioOptions.SfxVolume);
+
+        // 걷기는 거의 안 들리고 달릴수록 또렷하게 (pace²)
+        if (!water && WetAmount > 0f && wetClips != null && wetClips.Length > 0)
+        {
+            wadeSource.pitch = Random.Range(0.95f, 1.1f);
+            wadeSource.PlayOneShot(wetClips[Random.Range(0, wetClips.Length)], volume * WetAmount * pace * pace * AudioOptions.SfxVolume);
+        }
+    }
+
+    void Lift(Vector3 foot)
+    {
+        if (liftClips == null || liftClips.Length == 0 || !PlanarWaterReflection.FindWater(foot, out _)) return;
+        float pace = Mathf.Lerp(0.45f, 1f, Mathf.Clamp01(speed / runSpeed));
+        wadeSource.pitch = Random.Range(0.92f, 1.12f);
+        wadeSource.PlayOneShot(liftClips[Random.Range(0, liftClips.Length)], volume * LiftVolume * pace * AudioOptions.SfxVolume);
     }
 }

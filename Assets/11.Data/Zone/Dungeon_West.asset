@@ -15,8 +15,8 @@ MonoBehaviour:
   zoneName: Dungeon_West
   seed: 386
   origin: {x: -110, y: 0, z: 0}
-  displayNumber: "\uB358\uC804"
-  displayName: "\uC11C\uCABD \uBD09\uC778 \xB7 \uD63C\uC804"
+  displayNumber: "\uC678\uACFD"
+  displayName: "\uC11C\uCABD \uBD09\uC778"
   combatRadius: 15
   wallRadius: 19
   gateHalfWidth: 3.5

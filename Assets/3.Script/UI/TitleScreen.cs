@@ -7,7 +7,8 @@ using UnityEngine.UI;
 
 // 타이틀: 3D 무대(TitleStage) + "PRESS ANY KEY" 대문 + 키보드로 고르는 메뉴
 // 흐름: 검은 화면에서 번개와 함께 로고가 베이듯 나타남 → 아무 키 → 카메라가 검객에게 다가가고 로고는 왼쪽 위, 메뉴는 왼쪽
-//  - NEW GAME: 수련을 끝낸 적이 없으면 수련장, 있으면 "수련장부터 / 바로 산문" 선택
+//  - [변경] LOAD GAME: 저장이 있으면 맨 위 (레벨 · 저장 시각), 저장본을 불러 마을부터
+//  - [변경] NEW GAME: 항상 수련장부터 → 마을. 저장이 있으면 지울지 한 번 묻고 시작
 //  - TRAINING: 자유 연습장 (씬이 빌드에 있으면 보임)
 //  - SETTINGS: 같은 씬의 SettingsMenu를 열고, 닫히면 메뉴로 돌아옴
 //  - 메뉴: ↑↓/W·S/마우스로 고르고 Enter·Space·클릭으로 결정, ESC는 한 단계 뒤로 (맨 위에서는 대문 화면으로)
@@ -30,7 +31,7 @@ public class TitleScreen : MonoBehaviour
     [SerializeField] string tutorialScene = "Tutorial";
     [SerializeField] string mainScene = "InGame";
     [SerializeField] string trainingScene = "Training";
-    [SerializeField] string villageScene = "Village"; // [변경] START GAME → 마을
+    [SerializeField] string villageScene = "Village"; // START GAME → 마을
     [SerializeField] Color accent = new Color(0.95f, 0.8f, 0.45f);
     [SerializeField] Color bolt = new Color(0.62f, 0.82f, 1f);
     [SerializeField] Vector2 flashInterval = new Vector2(5f, 10f);
@@ -133,19 +134,19 @@ public class TitleScreen : MonoBehaviour
         menuRoot = NewRoot(c, "Menu");
         menuGroup = menuRoot.AddComponent<CanvasGroup>();
         float y = 470f;
-        AddItem(menuItems, menuRoot.transform, serif, "NEW GAME", "새 게임", ref y, NewGame); // [변경]
+        if (SaveGame.Exists) AddItem(menuItems, menuRoot.transform, serif, "LOAD GAME", "이어하기  ·  " + SaveGame.Summary, ref y, LoadGame);
+        AddItem(menuItems, menuRoot.transform, serif, "NEW GAME", "새 게임", ref y, NewGame);
         if (Application.CanStreamedLevelBeLoaded(trainingScene)) AddItem(menuItems, menuRoot.transform, serif, "TRAINING", "자유 연습", ref y, () => Go(trainingScene));
         AddItem(menuItems, menuRoot.transform, serif, "SETTINGS", "환경 설정", ref y, OpenSettings);
         AddItem(menuItems, menuRoot.transform, serif, "QUIT", "종료", ref y, Quit);
 
-        // 시작 위치 선택 (메뉴와 같은 자리에 바꿔 보여 줌)
+        // [변경] 새 게임 확인 (저장이 있을 때만, 메뉴와 같은 자리에 바꿔 보여 줌)
         choiceRoot = NewRoot(c, "StartChoice");
         choiceGroup = choiceRoot.AddComponent<CanvasGroup>();
-        Text ask = UIKit.Text(choiceRoot.transform, "어디서 시작할까요?", bodyFont, 22, accent, TextAnchor.MiddleLeft);
-        UIKit.Place(ask.rectTransform, MenuX, 425f, 500f, 30f);
+        Text ask = UIKit.Text(choiceRoot.transform, "저장된 기록을 지우고 새로 시작할까요?", bodyFont, 22, accent, TextAnchor.MiddleLeft);
+        UIKit.Place(ask.rectTransform, MenuX, 425f, 640f, 30f);
         y = 490f;
-        AddItem(choiceItems, choiceRoot.transform, serif, "Tutorial", "수련장부터", ref y, () => Go(tutorialScene));
-        AddItem(choiceItems, choiceRoot.transform, serif, "InGame", "바로 산문", ref y, () => Go(mainScene));
+        AddItem(choiceItems, choiceRoot.transform, serif, "NEW GAME", "기록을 지우고 수련장부터", ref y, StartNew);
         y += 16f;
         AddItem(choiceItems, choiceRoot.transform, serif, "BACK", "뒤로", ref y, ShowMenu);
         choiceRoot.SetActive(false);
@@ -237,7 +238,7 @@ public class TitleScreen : MonoBehaviour
         item.label = UIKit.Text(parent, label, font, 32, new Color(1f, 1f, 1f, 0f), TextAnchor.MiddleLeft);
         UIKit.Place(item.label.rectTransform, MenuX, y, 300f, 56f);
         item.caption = UIKit.Text(parent, caption, bodyFont, 17, new Color(1f, 1f, 1f, 0f), TextAnchor.MiddleLeft);
-        UIKit.Place(item.caption.rectTransform, MenuX + 290f, y + 2f, 200f, 30f);
+        UIKit.Place(item.caption.rectTransform, MenuX + 290f, y + 2f, 340f, 30f); // [변경] 이어하기 요약 · 확인 문구가 한 줄에 들어가게
         list.Add(item);
         y += 70f;
     }
@@ -263,24 +264,32 @@ public class TitleScreen : MonoBehaviour
         items[selected].action();
     }
 
+    // [변경] 새 게임 = 수련장 → (수련 완료) → 마을. 저장이 있으면 덮어쓸지 확인 (기본 선택은 뒤로)
     void NewGame()
     {
-        // [변경] 마을이 빌드에 있으면 항상 마을로 (수련장은 마을 포탈에서). 없을 때만 예전 선택지
-        if (Application.CanStreamedLevelBeLoaded(villageScene))
+        if (!SaveGame.Exists)
         {
-            Go(villageScene);
+            StartNew();
             return;
         }
-        if (!TutorialDirector.CompletedBefore)
-        {
-            Go(tutorialScene);
-            return;
-        }
-        menuRoot.SetActive(false); // 수련을 끝낸 적이 있으면 시작 위치를 고름
+        menuRoot.SetActive(false);
         choiceRoot.SetActive(true);
         items = choiceItems;
-        selected = 1; // 기본은 바로 산문
+        selected = choiceItems.Count - 1;
         brushPop = 0f;
+    }
+
+    void StartNew()
+    {
+        SaveGame.Delete();
+        Go(tutorialScene);
+    }
+
+    // 저장본을 RunState에 넣고 그대로 들고 마을로 (전환이 비우지 않게 keepSnapshot)
+    void LoadGame()
+    {
+        if (!SaveGame.Load()) return;
+        Go(Application.CanStreamedLevelBeLoaded(villageScene) ? villageScene : mainScene, true);
     }
 
     void ShowMenu()
@@ -304,15 +313,15 @@ public class TitleScreen : MonoBehaviour
         settings.Open();
     }
 
-    void Go(string scene)
+    void Go(string scene, bool keepLoaded = false)
     {
         if (phase == Phase.Leaving) return;
         phase = Phase.Leaving;
-        StartCoroutine(Leave(scene));
+        StartCoroutine(Leave(scene, keepLoaded));
     }
 
 // 시작 연출: 발도 베기 → 화면을 가르는 섬광 → 장면 전환(검게 닫힘)
-    IEnumerator Leave(string scene)
+    IEnumerator Leave(string scene, bool keepLoaded)
     {
         stage.PlayRelease();
         StartCoroutine(FadeMusic());
@@ -329,7 +338,7 @@ public class TitleScreen : MonoBehaviour
             cut.color = new Color(1f, 1f, 1f, Mathf.Lerp(0f, 0.85f, t / 0.18f));
             yield return null;
         }
-        SceneTransition.Load(scene, false); // 새로 시작 → 이전 판의 스킬·레벨을 이어받지 않음
+        SceneTransition.Load(scene, false, null, keepLoaded); // 새로 시작 → 비움 / 불러오기 → 불러온 상태 그대로
         for (float t = 0f; t < 0.5f; t += Time.unscaledDeltaTime)
         {
             cut.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.85f, 0f, t / 0.5f));

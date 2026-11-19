@@ -264,6 +264,85 @@ public static class MapDressing
         return SavePrefab(root);
     }
 
+    // [변경] 허수아비 (짚 샌드백, 약 2.2m): 박힌 말뚝 · 가로대 팔 · 새끼줄로 묶은 짚 몸통과 팔 · 짚 머리 · 삿갓 · 아래로 삐져나온 짚
+    //  보이는 부분은 전부 Pivot(밑동) 아래 → StrawDummy가 맞은 방향으로 기울였다 되돌림
+    static GameObject BuildScarecrow(Mats m)
+    {
+        Material straw = m.straw;
+        Material hat = Lit("Straw_Hat", new Color(0.5f, 0.42f, 0.26f), 0.05f);
+        Material rope = Lit("Rope_Dark", new Color(0.24f, 0.19f, 0.12f), 0.05f);
+        var root = new GameObject("Forest_Scarecrow");
+        var pivot = new GameObject("Pivot").transform;
+        pivot.SetParent(root.transform, false);
+
+        Cylinder(pivot, "Post", new Vector3(0f, 1.05f, 0f), new Vector3(0.12f, 1.1f, 0.12f), m.wood, false);
+        var bar = Cylinder(pivot, "Crossbar", new Vector3(0f, 1.5f, 0f), new Vector3(0.09f, 0.75f, 0.09f), m.wood, false);
+        bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+
+        // 몸통: 위가 조금 넓은 짚 다발 두 겹 + 새끼줄 세 줄
+        Cylinder(pivot, "Body", new Vector3(0f, 1.2f, 0f), new Vector3(0.5f, 0.38f, 0.42f), straw, false);
+        Cylinder(pivot, "Chest", new Vector3(0f, 1.42f, 0f), new Vector3(0.56f, 0.12f, 0.46f), straw, false);
+        foreach (float y in new[] { 0.95f, 1.18f, 1.4f })
+            Cylinder(pivot, "Rope", new Vector3(0f, y, 0f), new Vector3(0.53f, 0.02f, 0.45f), rope, false);
+        // 아래로 삐져나온 짚 가닥
+        for (int i = 0; i < 10; i++)
+        {
+            float a = i * 36f;
+            var tuft = Box(pivot, "Straw", Quaternion.Euler(0f, a, 0f) * new Vector3(0f, 0.74f, 0.17f), new Vector3(0.05f, 0.28f, 0.015f), straw, false);
+            tuft.transform.localRotation = Quaternion.Euler(0f, a, 0f) * Quaternion.Euler(-14f, 0f, 0f);
+        }
+
+        // 팔: 가로대 끝을 감싼 짚 다발 + 손목 끈 + 삐져나온 짚
+        foreach (float side in new[] { -1f, 1f })
+        {
+            var arm = Cylinder(pivot, "Arm", new Vector3(side * 0.52f, 1.5f, 0f), new Vector3(0.17f, 0.2f, 0.17f), straw, false);
+            arm.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            var cuff = Cylinder(pivot, "Rope", new Vector3(side * 0.66f, 1.5f, 0f), new Vector3(0.18f, 0.015f, 0.18f), rope, false);
+            cuff.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            for (int i = 0; i < 4; i++)
+            {
+                var tuft = Box(pivot, "Straw", new Vector3(side * 0.78f, 1.5f + (i - 1.5f) * 0.035f, (i % 2 - 0.5f) * 0.05f), new Vector3(0.14f, 0.012f, 0.03f), straw, false);
+                tuft.transform.localRotation = Quaternion.Euler(0f, 0f, side * (i - 1.5f) * 10f);
+            }
+        }
+
+        // 머리 + 목 끈 + 삿갓
+        Primitive(PrimitiveType.Sphere, pivot, "Head", new Vector3(0f, 1.84f, 0f), new Vector3(0.36f, 0.4f, 0.34f), straw, false);
+        Cylinder(pivot, "Rope", new Vector3(0f, 1.66f, 0f), new Vector3(0.2f, 0.02f, 0.2f), rope, false);
+        var cap = new GameObject("Hat");
+        cap.transform.SetParent(pivot, false);
+        cap.transform.localPosition = new Vector3(0f, 1.95f, 0f);
+        cap.transform.localRotation = Quaternion.Euler(-6f, 0f, 4f);
+        cap.AddComponent<MeshFilter>().sharedMesh = ConeMesh("Scarecrow_Hat", 0.46f, 0.24f);
+        cap.AddComponent<MeshRenderer>().sharedMaterial = hat;
+
+        var body = root.AddComponent<CapsuleCollider>();
+        body.center = new Vector3(0f, 1.1f, 0f);
+        body.radius = 0.32f;
+        body.height = 2.2f;
+        var dummy = root.AddComponent<StrawDummy>();
+        var so = new SerializedObject(dummy);
+        so.FindProperty("pivot").objectReferenceValue = pivot;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return SavePrefab(root);
+    }
+
+    // 원뿔 (삿갓): 밑면 반지름 radius · 높이 height, 아래에서도 보이게 양면
+    static Mesh ConeMesh(string name, float radius, float height)
+    {
+        const int seg = 24;
+        var faces = new List<Vector3[]>();
+        Vector3 top = new Vector3(0f, height, 0f);
+        for (int i = 0; i < seg; i++)
+        {
+            float a0 = i * Mathf.PI * 2f / seg, a1 = (i + 1) * Mathf.PI * 2f / seg;
+            Vector3 p0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0)) * radius;
+            Vector3 p1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1)) * radius;
+            faces.Add(new[] { p1, top, p0 });
+        }
+        return SaveMesh(name, faces, true);
+    }
+
     // 장작더미: 통나무 3 · 2 · 1단 + 양옆 말뚝
     static GameObject BuildWoodPile(Mats m)
     {
@@ -466,6 +545,21 @@ public static class MapDressing
             Road(theme, roads, root, rng, c + new Vector3(2.5f, 0f, -2.5f), c + new Vector3(9.5f, 0f, -7.5f));
         }
 
+        // [변경] 허수아비(짚 샌드백) 3개: 서쪽 길과 북서 정자 사이 빈터, 광장 쪽을 봄 + 발밑 짚 더미 · 풀
+        GameObject scarecrow = BuildScarecrow(m);
+        foreach (Vector3 spot in new[] { new Vector3(-11.5f, 0f, 8f), new Vector3(-14.5f, 0f, 7.4f), new Vector3(-17.5f, 0f, 8.1f) })
+        {
+            Vector3 face = (c - (c + spot)).normalized;
+            Place(scarecrow, root, c + spot, Quaternion.Euler(0f, (float)rng.NextDouble() * 30f - 15f, 0f) * face, 0f, 0.05f, true);
+            for (int i = 0; i < 4 && grass.Length > 0; i++)
+            {
+                float a = (float)rng.NextDouble() * Mathf.PI * 2f;
+                Vector3 p = c + spot + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (0.7f + (float)rng.NextDouble() * 1.2f);
+                Place(grass[rng.Next(grass.Length)], root, p, Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f) * Vector3.forward, 0f, 0f, false);
+            }
+            count++;
+        }
+
         // 광장 나무 3그루 + 둘레 풀 무리
         var treeSpots = new[] { new Vector3(7f, 0f, 9f), new Vector3(-8f, 0f, -7f), new Vector3(9f, 0f, -15f) };
         foreach (Vector3 spot in treeSpots)
@@ -579,7 +673,7 @@ public static class MapDressing
     }
 
     // ===== 화톳불 (篝火): 돌 받침 + 쇠 삼발이 · 쇠 바구니 + 장작 · 숯불 · 불꽃 =====
-    // [변경] 기본 도형 돌 등롱 → 숲 구조물과 같은 재질의 화톳불. 프리팹을 제자리에서 고쳐 씬마다 옮긴 위치 · 이름은 그대로
+    // 기본 도형 돌 등롱 → 숲 구조물과 같은 재질의 화톳불. 프리팹을 제자리에서 고쳐 씬마다 옮긴 위치 · 이름은 그대로
     const string ShrinePrefab = "Assets/2.Model/Prefabs/Shrine.prefab";
     const string ShrineMatFolder = "Assets/6.Materials/Shrine";
 

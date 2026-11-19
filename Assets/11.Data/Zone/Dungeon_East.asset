@@ -15,7 +15,7 @@ MonoBehaviour:
   zoneName: Dungeon_East
   seed: 386
   origin: {x: 110, y: 0, z: 0}
-  displayNumber: "\uB358\uC804"
+  displayNumber: "\uC678\uACFD"
   displayName: "\uB3D9\uCABD \uBD09\uC778 \xB7 \uC815\uC608"
   combatRadius: 15
   wallRadius: 19

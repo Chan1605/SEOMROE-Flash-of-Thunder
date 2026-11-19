@@ -73,14 +73,22 @@ public class Shrine : MonoBehaviour
         // 핵심: 휴식 = 체력 회복 → 스킬트리
         if (health != null) health.HealFull();
         menu.Open();
+        StartCoroutine(SaveWhenClosed()); // [변경] 스킬트리를 닫으면 자동 저장
         if (logRest) Debug.Log($"[Shrine] {name}에서 휴식");
+    }
+
+    // 수련장 · 연습장 화톳불은 저장하지 않음 (불러오기는 늘 수련을 마친 마을부터)
+    System.Collections.IEnumerator SaveWhenClosed()
+    {
+        while (SkillTreeMenu.Instance != null && SkillTreeMenu.Instance.IsOpen) yield return null;
+        if (FindAnyObjectByType<TutorialDirector>() == null && FindAnyObjectByType<TrainingMode>() == null) SaveGame.Save();
     }
 
     // ===== 휴식처 표시 =====
     void BuildLook()
     {
         var mat = new Material(Shader.Find("Sprites/Default"));
-        var sparkMat = new Material(mat) { mainTexture = SparkTexture() }; // [변경] 네모 → 둥근 빛 점
+        var sparkMat = new Material(mat) { mainTexture = SparkTexture() }; // 네모 → 둥근 빛 점
 
         // 위로 오르는 불티: 움직이는 방향으로 살짝 늘어난 둥근 점 (불똥 꼬리)
         var ps = new GameObject("Embers").AddComponent<ParticleSystem>();

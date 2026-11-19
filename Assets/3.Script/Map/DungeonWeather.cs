@@ -14,11 +14,12 @@ public class DungeonWeather : MonoBehaviour
     [SerializeField] float thunderVolume = 0.8f;
     [SerializeField] float sunBoost = 2.5f;      // 번쩍일 때 햇빛에 더하는 밝기
     [SerializeField, Range(0f, 1f)] float screenFlash = 0.12f;
-    [SerializeField] float rainRate = 3000f;   // [변경] 먼 비 층 기준 (가까운 층은 이 값의 0.35배)
-    [SerializeField] float splashRate = 450f;  // [변경] 바닥 물방울 튐
+    [SerializeField] float rainRate = 3000f;   // 먼 비 층 기준 (가까운 층은 이 값의 0.35배)
+    [SerializeField] float splashRate = 450f;  // 바닥 물방울 튐
+    [SerializeField, Range(0f, 1f)] float wetStepVolume = 0.28f; // [변경] 젖은 발소리 (0이면 마른 발소리 그대로)
 
     Transform cam;
-    ParticleSystem rainNear, rainFar, splash; // [변경] 비를 가까운 층 · 먼 층으로 나누고 바닥 튐 추가
+    ParticleSystem rainNear, rainFar, splash; // 비를 가까운 층 · 먼 층으로 나누고 바닥 튐 추가
     Material dropMat, ringMat;
     float groundY, groundTimer;
     AudioSource rainSource, thunderSource;
@@ -33,7 +34,7 @@ public class DungeonWeather : MonoBehaviour
     {
         cam = Camera.main != null ? Camera.main.transform : null;
         sun = FindSun();
-        groundY = cam != null ? GroundBelow(cam.position, cam.position.y - 2f) : 0f; // [변경]
+        groundY = cam != null ? GroundBelow(cam.position, cam.position.y - 2f) : 0f;
         BuildRain();
         BuildBolt();
         BuildFlash();
@@ -54,12 +55,14 @@ public class DungeonWeather : MonoBehaviour
             Resources.Load<AudioClip>("Audio/Weather/thunder_03"),
         };
         timer = Random.Range(2f, 5f); // 들어오고 곧 한 번
+        PlayerFootsteps.WetAmount = wetStepVolume;
     }
 
     void OnDestroy()
     {
+        PlayerFootsteps.WetAmount = 0f; // 다른 씬으로 가면 마른 발소리
         if (dropMat != null) Destroy(dropMat.mainTexture);
-        if (ringMat != null) Destroy(ringMat.mainTexture); // [변경] 실행 중 만든 텍스처 정리
+        if (ringMat != null) Destroy(ringMat.mainTexture); // 실행 중 만든 텍스처 정리
         if (sun != null && flash > 0f) sun.intensity = sunBase;
     }
 
@@ -75,7 +78,7 @@ public class DungeonWeather : MonoBehaviour
     void LateUpdate()
     {
         if (cam == null && Camera.main != null) cam = Camera.main.transform;
-        // [변경] 두 층의 비 · 바닥 튐이 카메라를 따라다님
+        // 두 층의 비 · 바닥 튐이 카메라를 따라다님
         if (cam != null)
         {
             rainNear.transform.position = cam.position + Vector3.up * 7f;
@@ -144,7 +147,7 @@ public class DungeonWeather : MonoBehaviour
     }
 
     // ===== 만들기 =====
-    // [변경] 비 다시 만듦: 부드러운 점 텍스처로 끝이 가늘어지는 얇은 빗줄기, 가까운/먼 두 층으로 깊이감, 바닥에 물방울 고리
+    // 비 다시 만듦: 부드러운 점 텍스처로 끝이 가늘어지는 얇은 빗줄기, 가까운/먼 두 층으로 깊이감, 바닥에 물방울 고리
     void BuildRain()
     {
         dropMat = new Material(Shader.Find("Sprites/Default")) { mainTexture = SoftDot() };

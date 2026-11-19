@@ -15,6 +15,10 @@ public class PlayerGroundFx : MonoBehaviour
     [SerializeField] float landAirTime = 0.35f;
 
     ParticleSystem dust, drops, ripples;
+    // [변경] 물속을 걸을 때 다리 둘레로 계속 퍼지는 물결 + 앞으로 차이는 물방울
+    [SerializeField] float wakeInterval = 0.16f;
+    float wakeTimer, moveSpeed;
+    Vector3 lastPosition;
     PlayerFootsteps footsteps;
     PlayerLocomotion locomotion;
     float airTime;
@@ -63,12 +67,38 @@ public class PlayerGroundFx : MonoBehaviour
             if (footsteps != null) footsteps.Planted += OnPlanted;
         }
 
+        Vector3 delta = transform.position - lastPosition;
+        delta.y = 0f;
+        lastPosition = transform.position;
+        if (Time.deltaTime > 0f) moveSpeed = Mathf.Lerp(moveSpeed, delta.magnitude / Time.deltaTime, Mathf.Clamp01(Time.deltaTime * 10f));
+        Wake(delta);
+
         if (locomotion == null) return;
         if (!locomotion.IsGrounded) airTime += Time.deltaTime;
         else
         {
             if (airTime > landAirTime) Burst(transform.position, landDust, 1.6f, Vector3.zero);
             airTime = 0f;
+        }
+    }
+
+    void Wake(Vector3 delta)
+    {
+        if (moveSpeed < 0.6f || !PlanarWaterReflection.FindWater(transform.position, out float waterY)) { wakeTimer = 0f; return; }
+        wakeTimer -= Time.deltaTime;
+        if (wakeTimer > 0f) return;
+        float k = Mathf.Clamp01(moveSpeed / 6f);
+        wakeTimer = wakeInterval * Mathf.Lerp(1.4f, 0.8f, k);
+        Vector3 p = new Vector3(transform.position.x, waterY + 0.02f, transform.position.z);
+        Color c = splashColor;
+        c.a *= Mathf.Lerp(0.45f, 0.75f, k);
+        Emit(ripples, p + Random.insideUnitSphere * 0.15f, Vector3.zero, Mathf.Lerp(0.9f, 1.5f, k), 1.1f, c);
+        Vector3 forward = delta.sqrMagnitude > 1e-6f ? delta.normalized : transform.forward;
+        for (int i = 0; i < Mathf.RoundToInt(Mathf.Lerp(1f, 4f, k)); i++)
+        {
+            Vector3 v = forward * Random.Range(0.8f, 2f) * k + Random.insideUnitSphere * 0.5f;
+            v.y = Random.Range(0.8f, 1.8f) * (0.5f + k);
+            Emit(drops, p + forward * 0.3f, v, Random.Range(0.025f, 0.05f), Random.Range(0.3f, 0.5f), splashColor);
         }
     }
 

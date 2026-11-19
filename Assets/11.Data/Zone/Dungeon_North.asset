@@ -15,8 +15,8 @@ MonoBehaviour:
   zoneName: Dungeon_North
   seed: 393
   origin: {x: 0, y: 0, z: 110}
-  displayNumber: "\uB358\uC804"
-  displayName: "\uBD81\uCABD \uBD09\uC778 \xB7 \uBC84\uD2F0\uAE30"
+  displayNumber: "\uC678\uACFD"
+  displayName: "\uBD81\uCABD \uBD09\uC778"
   combatRadius: 15
   wallRadius: 19
   gateHalfWidth: 3.5

@@ -21,7 +21,7 @@ public class PlayerRimLight : MonoBehaviour
         mask = 1u << renderingLayer;
         Tag();
         fill = MakeLight("PlayerFillLight", fillColor, fillIntensity, fillRange);
-        rim = MakeLight("PlayerRimLight", rimColor, rimIntensity, rimRange);
+        //rim = MakeLight("PlayerRimLight", rimColor, rimIntensity, rimRange);
     }
 
     // 플레이어 렌더러에 레이어 추가 (새로 생긴 칼 · 칼집 같은 것도 잡게 가끔 다시)
@@ -59,6 +59,6 @@ public class PlayerRimLight : MonoBehaviour
         Vector3 right = Vector3.Cross(Vector3.up, forward);
         Vector3 chest = transform.position + Vector3.up * height;
         fill.transform.position = chest - forward * 1.6f + right * 0.6f + Vector3.up * 0.5f; // 카메라 쪽 · 살짝 옆 위
-        rim.transform.position = chest + forward * 1.3f - right * 0.5f + Vector3.up * 0.9f;  // 캐릭터 뒤 위
+       // rim.transform.position = chest + forward * 1.3f - right * 0.5f + Vector3.up * 0.9f;  // 캐릭터 뒤 위
     }
 }

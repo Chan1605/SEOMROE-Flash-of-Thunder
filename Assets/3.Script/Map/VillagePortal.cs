@@ -14,8 +14,8 @@ public class VillagePortal : MonoBehaviour
     public const string VillageScene = "Village";
     public const string TutorialDoneFlag = "TutorialDone";
     public const string ReturnPoint = "VillagePortals/Portal_Sanmun/Arrive"; // 본편 · 던전에서 돌아올 때 서는 자리
-    public const string TutorialReturnPoint = "VillagePortals/Portal_Tutorial/Arrive"; // [변경] 수련장 · 연습장에서 돌아올 때
-    public const string FromVillageFlag = "FromVillage"; // [변경] 마을 포탈로 떠났다는 표시 (연습장에서 마을로 돌아가기 허용)
+    public const string TutorialReturnPoint = "VillagePortals/Portal_Tutorial/Arrive"; // 수련장 · 연습장에서 돌아올 때
+    public const string FromVillageFlag = "FromVillage"; // 마을 포탈로 떠났다는 표시 (연습장에서 마을로 돌아가기 허용)
 
     public enum When { Always, BeforeTutorial, AfterTutorial, Never }
 
@@ -33,7 +33,7 @@ public class VillagePortal : MonoBehaviour
     [SerializeField] Color color = new Color(0.55f, 0.78f, 1f);
     [SerializeField] Color lockedColor = new Color(0.85f, 0.22f, 0.18f);
 
-    // [변경] 수련을 끝낸 뒤 이 포탈의 목적지 (비우면 그대로). 수련장 포탈 → 연습장
+    // 수련을 끝낸 뒤 이 포탈의 목적지 (비우면 그대로). 수련장 포탈 → 연습장
     [Header("After Tutorial")]
     [SerializeField] string altScene = "";
     [SerializeField] string altName = "";
@@ -49,7 +49,7 @@ public class VillagePortal : MonoBehaviour
 
     public static bool TutorialDone => RunState.HasFlag(TutorialDoneFlag) || TutorialDirector.CompletedBefore;
 
-    bool UseAlt => !string.IsNullOrEmpty(altScene) && TutorialDone; // [변경]
+    bool UseAlt => !string.IsNullOrEmpty(altScene); // [변경] 새 게임은 항상 수련장부터라 마을에선 수련을 마친 뒤 → 수련장 포탈은 늘 연습장
     string TargetScene => UseAlt ? altScene : sceneName;
     string TargetName => UseAlt && !string.IsNullOrEmpty(altName) ? altName : displayName;
 
@@ -69,8 +69,16 @@ public class VillagePortal : MonoBehaviour
     void OnEnable() => all.Add(this);  
     void OnDisable() => all.Remove(this);
 
+    static int savedScene = -1;
+
     void Start()
     {
+        // [변경] 마을에 들어올 때 한 번 자동 저장 (포탈이 여러 개여도 씬마다 한 번)
+        if (savedScene != gameObject.scene.handle)
+        {
+            savedScene = gameObject.scene.handle;
+            SaveGame.Save();
+        }
         health = FindAnyObjectByType<PlayerHealth>();
         if (health != null) player = health.transform;
         if (barrier != null && barrier.TryGetComponent(out Renderer r)) barrierMat = r.material; // 이 문만 색을 바꾸도록 복사본
@@ -103,7 +111,7 @@ public class VillagePortal : MonoBehaviour
             near = d.sqrMagnitude <= range * range;
         }
         if (prompt != null)
-            prompt.text = !near || showing ? "" : open ? $"E   {TargetName}" : $"{displayName}  —  {lockedHint}"; // [변경] TargetName
+            prompt.text = !near || showing ? "" : open ? $"E   {TargetName}" : $"{displayName}  —  {lockedHint}"; // TargetName
 
         // 잠긴 문: 범위에 들어오는 순간(또는 E) 안내 연출
         bool entered = near && !wasNear;
@@ -118,7 +126,7 @@ public class VillagePortal : MonoBehaviour
             return;
         }
         if (!pressed) return;
-        RunState.SetFlag(FromVillageFlag); // [변경]
+        RunState.SetFlag(FromVillageFlag);
         SceneTransition.Load(TargetScene, true, spawnAt);
     }
 
