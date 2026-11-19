@@ -41,6 +41,27 @@ public class EnemyData : ScriptableObject
     [Header("Death")]
     [SerializeField] float respawnTime = 3f;
     [SerializeField] int xpReward = 10; // 구역 적을 처치하면 플레이어가 받는 경험치
+    [SerializeField] float deathPush = 1.3f; // [변경] 쓰러질 때 맞은 방향으로 미끄러지는 거리
+
+    // [변경] 일반 적 행동 (EnemySwordsman.Tactics.cs). 보스 · 수련 상대는 쓰지 않음
+    //  회피: 나를 향한 공격이 시작되면 뒤/옆으로 빠짐 → 확률로 곧바로 반격
+    //  달려들기: 거리가 벌어지면 달려와 짧은 예고로 베기 / 끼어들기: 플레이어가 다른 적을 칠 때 옆에서 짧은 예고로 베기
+    [Header("Tactics")]
+    [SerializeField, Range(0f, 1f)] float evadeChance = 0.25f;
+    [SerializeField] float evadeRange = 3.2f;
+    [SerializeField] float evadeDistance = 2.6f;
+    [SerializeField] float evadeTime = 0.32f;
+    [SerializeField] float evadeCooldown = 3.5f;
+    [SerializeField, Range(0f, 1f)] float counterChance = 0.5f;
+    [SerializeField] float counterWindupScale = 0.5f;
+    [SerializeField, Range(0f, 1f)] float lungeChance = 0.5f;
+    [SerializeField] Vector2 lungeDistance = new Vector2(4.5f, 8.5f);
+    [SerializeField] float lungeSpeedScale = 1.8f;
+    [SerializeField] float lungeWindupScale = 0.6f;
+    [SerializeField] float lungeCooldown = 5f;
+    [SerializeField, Range(0f, 1f)] float punishChance = 0.35f;
+    [SerializeField] float punishWindupScale = 0.6f;
+    [SerializeField] float punishCooldown = 4f;
 
     // 방패병: 정면 guardAngle 안의 □·△를 막고 가드 수치를 깎음. 0이 되면 가드 붕괴(긴 경직)
     // 간파·패링 반격, 뇌락, 차지 강타 2단계 이상은 한 번에 붕괴. 등 뒤와 벽력일섬은 막지 못함
@@ -79,7 +100,7 @@ public class EnemyData : ScriptableObject
     [SerializeField] float parryPosture = 30f;        // 간파·패링 한 번에 쌓이는 체간
     [SerializeField] float postureTakenScale = 0.5f;  // 공격으로 받는 체간 배율 (간파·패링은 parryPosture 그대로)
     [SerializeField, Range(0.05f, 1f)] float executionDamageRatio = 0.25f;
-    [SerializeField, Range(0f, 1.5f)] float bossLevelScaling = 0.8f; // [변경] 플레이어 공격력(레벨 · 보너스) ^ 이 값만큼 보스 체력 · 체간이 늘어남. 0 = 끔, 1 = 레벨 무관하게 같은 전투 길이
+    [SerializeField, Range(0f, 1.5f)] float bossLevelScaling = 0.8f; // 플레이어 공격력(레벨 · 보너스) ^ 이 값만큼 보스 체력 · 체간이 늘어남. 0 = 끔, 1 = 레벨 무관하게 같은 전투 길이
     [SerializeField, Range(0.05f, 1f)] float normalDamageScale = 0.35f; // 평소(체간 붕괴 전) 받는 피해 배율 → 체간을 무너뜨려야 크게 깎임
     [SerializeField] float brokenDamageScale = 1.5f;                    // 체간 붕괴 중 받는 피해 배율 (처형 피해는 별도)
     [SerializeField, Range(0.01f, 1f)] float instantKillDamageRatio = 0.12f; // 일섬 즉사(뇌인 가득)는 보스에게 이 비율 피해
@@ -141,6 +162,33 @@ public class EnemyData : ScriptableObject
     [SerializeField] float wavePhase1CooldownScale = 1.5f;
     [SerializeField] float phase2WaveSpread = 20f;        // 2페이즈 검기를 이 각도로 세 갈래 (0이면 한 줄기)
 
+    // [변경] 2페이즈 새 패턴 (EnemySwordsman.BossSkills.cs)
+    // 뇌광 연참: 바닥에 선 예고 → 번개처럼 일직선으로 꿰뚫고 지나감 × dashCount (회피 · 점프로만), 끝나면 잠깐 숨 고름
+    [Header("Boss · Lightning Dash (2페이즈)")]
+    [SerializeField] int dashCount = 3;
+    [SerializeField] float dashWindup = 0.6f;
+    [SerializeField] float dashNextWindup = 0.35f;
+    [SerializeField] float dashSpeed = 26f;
+    [SerializeField] float dashOvershoot = 3f;      // 플레이어 너머로 더 가는 거리
+    [SerializeField] float dashMaxDistance = 16f;
+    [SerializeField] float dashWidth = 1.3f;
+    [SerializeField] float dashDamage = 24f;
+    [SerializeField] float dashMinDistance = 3.5f;
+    [SerializeField] float dashCooldown = 13f;
+    [SerializeField] float dashRecovery = 1.4f;
+
+    // 뇌운 낙뢰: 칼을 치켜들면 플레이어 발밑에 차례로 낙뢰 원이 생기고 차오르면 낙뢰 (보스는 그 뒤 바로 움직임)
+    [Header("Boss · Thunder Rain (2페이즈)")]
+    [SerializeField] int rainCount = 6;
+    [SerializeField] float rainCastTime = 1.2f;
+    [SerializeField] float rainInterval = 0.38f;
+    [SerializeField] float rainDelay = 0.9f;        // 원이 생기고 낙뢰가 떨어지기까지
+    [SerializeField] float rainRadius = 2.2f;
+    [SerializeField] float rainDamage = 18f;
+    [SerializeField] float rainScatter = 1.5f;      // 첫 원 뒤로는 플레이어 주변에 흩뿌림
+    [SerializeField] float rainMinDistance = 4f;
+    [SerializeField] float rainCooldown = 16f;
+
     public EnemyKind Kind => kind;
     public float MaxHealth => maxHealth;
 
@@ -169,6 +217,23 @@ public class EnemyData : ScriptableObject
 
     public float RespawnTime => respawnTime;
     public int XpReward => xpReward;
+    public float DeathPush => deathPush;
+
+    public float EvadeChance => evadeChance;
+    public float EvadeRange => evadeRange;
+    public float EvadeDistance => evadeDistance;
+    public float EvadeTime => evadeTime;
+    public float EvadeCooldown => evadeCooldown;
+    public float CounterChance => counterChance;
+    public float CounterWindupScale => counterWindupScale;
+    public float LungeChance => lungeChance;
+    public Vector2 LungeDistance => lungeDistance;
+    public float LungeSpeedScale => lungeSpeedScale;
+    public float LungeWindupScale => lungeWindupScale;
+    public float LungeCooldown => lungeCooldown;
+    public float PunishChance => punishChance;
+    public float PunishWindupScale => punishWindupScale;
+    public float PunishCooldown => punishCooldown;
 
     public int GuardPoints => guardPoints;
     public float GuardAngle => guardAngle;
@@ -200,7 +265,7 @@ public class EnemyData : ScriptableObject
     public float PostureTakenScale => postureTakenScale;
     public float ExecutionDamageRatio => executionDamageRatio;
     public float NormalDamageScale => normalDamageScale;
-    public float BossLevelScaling => bossLevelScaling; // [변경]
+    public float BossLevelScaling => bossLevelScaling;
     public float BrokenDamageScale => brokenDamageScale;
     public float InstantKillDamageRatio => instantKillDamageRatio;
     public float Phase2Ratio => phase2Ratio;
@@ -255,4 +320,26 @@ public class EnemyData : ScriptableObject
     public bool WavePhase1 => wavePhase1;
     public float WavePhase1CooldownScale => wavePhase1CooldownScale;
     public float Phase2WaveSpread => phase2WaveSpread;
+
+    public int DashCount => dashCount;
+    public float DashWindup => dashWindup;
+    public float DashNextWindup => dashNextWindup;
+    public float DashSpeed => dashSpeed;
+    public float DashOvershoot => dashOvershoot;
+    public float DashMaxDistance => dashMaxDistance;
+    public float DashWidth => dashWidth;
+    public float DashDamage => dashDamage;
+    public float DashMinDistance => dashMinDistance;
+    public float DashCooldown => dashCooldown;
+    public float DashRecovery => dashRecovery;
+
+    public int RainCount => rainCount;
+    public float RainCastTime => rainCastTime;
+    public float RainInterval => rainInterval;
+    public float RainDelay => rainDelay;
+    public float RainRadius => rainRadius;
+    public float RainDamage => rainDamage;
+    public float RainScatter => rainScatter;
+    public float RainMinDistance => rainMinDistance;
+    public float RainCooldown => rainCooldown;
 }

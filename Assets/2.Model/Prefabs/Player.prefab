@@ -1950,6 +1950,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3ced6db98785e44ea77718b1bfce350, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerClothFlutter
+  hemSources:
+  - hakama
+  hemTop: 0.12
+  hemFree: 0.2
   flutterMeshes:
   - fabric
   - belt1
@@ -1961,7 +1965,7 @@ MonoBehaviour:
   fullFreeDepth: 0.6
   stretching: 0.9
   bending: 0.4
-  damping: 0.15
+  damping: 0.25
   velocityScale: 0.6
   accelerationScale: 0.9
   wind: {x: 0.6, y: 0, z: 0.4}
@@ -2007,6 +2011,7 @@ MonoBehaviour:
   dodgeDust: 20
   landDust: 10
   landAirTime: 0.35
+  wakeInterval: 0.16
 --- !u!1 &1515010326207606855
 GameObject:
   m_ObjectHideFlags: 0
@@ -2341,7 +2346,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &4167747331419019021
 Transform:
   m_ObjectHideFlags: 0
@@ -3592,7 +3597,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &8091490666201137530
 Transform:
   m_ObjectHideFlags: 0
@@ -4254,7 +4259,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &4348942167328582632
 Transform:
   m_ObjectHideFlags: 0
@@ -5431,7 +5436,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2649004919975645600
 Transform:
   m_ObjectHideFlags: 0

@@ -31,7 +31,7 @@ public partial class EnemySwordsman
     }
 
     // 예고 시간: 위험 공격이면 더 길게 (판정 · 간파 계산도 이 값을 씀)
-    float WindupTime => data.WindupTime + (perilousCombo ? data.PerilousExtraWindup : 0f);
+    float WindupTime => data.WindupTime * windupScale + (perilousCombo ? data.PerilousExtraWindup : 0f); // [변경] 짧은 예고 배율 (Tactics)
 
     // 지금 다가오는(또는 휘두르는) 첫 타가 위험 공격인지
     bool PerilousNow => perilousCombo && data != null &&

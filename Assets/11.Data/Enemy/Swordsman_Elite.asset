@@ -37,3 +37,6 @@ MonoBehaviour:
   instantKillDamageRatio: 0.5
   useDelaySlash: 1
   delayChance: 0.4
+  evadeChance: 0.4
+  counterChance: 0.7
+  lungeChance: 0.6
