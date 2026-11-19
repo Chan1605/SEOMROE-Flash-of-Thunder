@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Water_Pond
+  m_Shader: {fileID: 4800000, guid: 95fa1c7326d7f824ba39eb416904b457, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _NormalMap:
+        m_Texture: {fileID: 2800000, guid: f8c0ffc5a4be0124ea7bd88905538803, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _DepthDistance: 0.7
+    - _EdgeFade: 0.12
+    - _F0: 0.06
+    - _FlowSpeed: 0.018
+    - _NormalStrength: 0.2
+    - _PlanarDistort: 0.03
+    - _Reflection: 1
+    - _Roughness: 0.02
+    - _ShoreWidth: 0.06
+    - _SpecPower: 700
+    - _SpecStrength: 3
+    - _Tiling: 0.38
+    m_Colors:
+    - _DeepColor: {r: 0.02, g: 0.045, b: 0.055, a: 0.95}
+    - _ShallowColor: {r: 0.14, g: 0.2, b: 0.19, a: 0.3}
+    - _ShoreColor: {r: 0.75, g: 0.8, b: 0.72, a: 0.25}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

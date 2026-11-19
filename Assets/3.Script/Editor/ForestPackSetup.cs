@@ -261,6 +261,22 @@ public static class ForestPackSetup
         // 바위 고리 사이사이 쓰러진 통나무 · 뿌리 (같은 크기 규칙으로 섞임)
         theme.wallRocks = Concat(set.wallRocks,
             Prefabs("Stumps Roots and Branches/Prefabs Moss Cover/prefab_{0}.prefab", "dead_log_01_Moss", "dead_log_03_Moss", "beech_old_roots_01_Moss"));
+
+        // [변경] 관상용 연못: 구역 2 숲길(공터 서쪽 가장자리) · 마을(광장 동쪽). 위치 = 구역 중심 기준 x, z
+        if (theme.name == "Zone2_Forest")
+            theme.ponds = new[] { new ZoneTheme.Pond { position = new Vector2(-10.5f, -3f), radius = 4.2f } };
+        else if (theme.name == "Village_Square")
+            theme.ponds = new[] { new ZoneTheme.Pond { position = new Vector2(18f, 3f), radius = 6.5f } };
+        if (theme.ponds != null && theme.ponds.Length > 0)
+        {
+            theme.pondDepth = 0.7f;
+            theme.waterMaterial = MapDressing.WaterMaterial();
+            theme.pondLayer = Layer("Terrain_Layer3_Soil_Wet", 0.45f);
+            theme.pondStones = Prefabs("Rocks/Prefabs/prefab_beech_forest_stones_01_{0}.prefab", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+            theme.pondPlants = Concat(
+                Prefabs("Foliage and Grass/Prefabs/prefab_{0}.prefab", "fern_01_1", "fern_01_2", "grass_01_1", "grass_02_1", "plant_01_1", "plant_02_1"),
+                Prefabs("Foliage and Grass/Prefabs/prefab_{0}.prefab", "shaggy_soldier_01_1"));
+        }
     }
 
     static Material SkyMaterial(string name, Color tint, float thickness, float sunSize, float exposure)
@@ -720,57 +736,71 @@ public static class ForestPackSetup
         return go;
     }
 
-    // [변경] 간접광(APV) 굽기 준비 (지금 열린 씬): 해 Mixed · 지형 Contribute GI + 프로브로 받기 · 전역 APV 볼륨 · 씬 전용 라이팅 설정
-    // 굽기는 Lighting 창 Adaptive Probe Volumes 탭에서 Min Probe Spacing을 정한 뒤 Generate Lighting
-    [MenuItem("Tools/Map/Forest Pack/Forest Look/Prepare Indirect Light (Current Scene)")]
-    static void PrepareIndirectLight()
+    // [변경] 간접광(APV) 되돌리기 (지금 열린 씬): APV 볼륨 · 구운 데이터 삭제, 구운 간접광 끔, 해 Realtime, URP 에셋 Light Probe System = Light Probe Groups
+    // 지형 Contribute GI · 프로브로 받기 · drawInstanced는 실시간 조명에 영향이 없어 그대로 둠
+    [MenuItem("Tools/Map/Forest Pack/Forest Look/Revert Indirect Light (Current Scene)")]
+    static void RevertIndirectLight()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode) return;
         var scene = EditorSceneManager.GetActiveScene();
 
+        var bakedFiles = new List<string>();
+        foreach (string guid in AssetDatabase.FindAssets("t:ProbeVolumeBakingSet"))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            bakedFiles.Add(path);
+            foreach (string dep in AssetDatabase.GetDependencies(path, false))
+                if (dep != path && dep.EndsWith(".bytes")) bakedFiles.Add(dep);
+        }
+        string list = bakedFiles.Count == 0 ? "(없음)" : string.Join("\n", bakedFiles);
+        if (!EditorUtility.DisplayDialog("간접광 되돌리기",
+            $"{scene.name} 씬의 APV 볼륨 · 구운 간접광을 지우고 해를 Realtime으로 되돌립니다.\n\n삭제할 구운 데이터:\n{list}", "되돌리기", "취소"))
+            return;
+
         int lights = 0;
         foreach (Light light in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            if (light.type != LightType.Directional) continue;
-            Undo.RecordObject(light, "Mixed Light");
-            light.lightmapBakeType = LightmapBakeType.Mixed;
+            if (light.type != LightType.Directional || light.lightmapBakeType == LightmapBakeType.Realtime) continue;
+            Undo.RecordObject(light, "Realtime Light");
+            light.lightmapBakeType = LightmapBakeType.Realtime;
             lights++;
         }
 
-        int terrains = 0;
-        foreach (Terrain terrain in Object.FindObjectsByType<Terrain>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        int volumes = 0;
+        foreach (ProbeVolume volume in Object.FindObjectsByType<ProbeVolume>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            ZoneGenerator.PrepareForBakedLight(terrain);
-            terrains++;
+            Undo.DestroyObjectImmediate(volume.gameObject);
+            volumes++;
         }
 
-        if (Object.FindAnyObjectByType<ProbeVolume>(FindObjectsInactive.Include) == null)
+        var settings = Lightmapping.TryGetLightingSettings(out var current) ? current : null;
+        if (settings != null)
         {
-            var go = new GameObject("Adaptive Probe Volume");
-            go.AddComponent<ProbeVolume>().mode = ProbeVolume.Mode.Global;
-            Undo.RegisterCreatedObjectUndo(go, "APV");
+            settings.bakedGI = false;
+            settings.realtimeGI = false;
+            EditorUtility.SetDirty(settings);
         }
+        Lightmapping.Clear();
+        Lightmapping.lightingDataAsset = null;
 
-        string folder = System.IO.Path.GetDirectoryName(scene.path).Replace('\\', '/');
-        string settingsPath = $"{folder}/{scene.name}_Lighting.lighting";
-        var settings = AssetDatabase.LoadAssetAtPath<LightingSettings>(settingsPath);
-        if (settings == null)
+        foreach (string path in bakedFiles) AssetDatabase.DeleteAsset(path);
+
+        // URP 에셋(품질 단계별 전부) Light Probe System: 1 = APV → 0 = Light Probe Groups
+        int assets = 0;
+        foreach (string guid in AssetDatabase.FindAssets("t:UniversalRenderPipelineAsset"))
         {
-            settings = new LightingSettings { name = scene.name + "_Lighting" };
-            AssetDatabase.CreateAsset(settings, settingsPath);
+            var rp = AssetDatabase.LoadMainAssetAtPath(AssetDatabase.GUIDToAssetPath(guid));
+            var so = new SerializedObject(rp);
+            var prop = so.FindProperty("m_LightProbeSystem");
+            if (prop == null || prop.intValue == 0) continue;
+            prop.intValue = 0;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            assets++;
         }
-        settings.realtimeGI = false;
-        settings.bakedGI = true;
-        settings.mixedBakeMode = MixedLightingMode.IndirectOnly;
-        settings.lightmapper = LightingSettings.Lightmapper.ProgressiveGPU;
-        settings.lightmapResolution = 2f;   // 라이트맵을 쓰는 물체가 거의 없게 해 둠 (지형은 프로브로 받음)
-        settings.lightmapMaxSize = 1024;
-        EditorUtility.SetDirty(settings);
-        Lightmapping.lightingSettings = settings;
 
         EditorSceneManager.MarkSceneDirty(scene);
         AssetDatabase.SaveAssets();
-        Debug.Log($"[ForestPack] {scene.name} 간접광 준비 · 해 {lights}개 Mixed · 지형 {terrains}개 · APV 전역 볼륨 → Lighting 창에서 Min Probe Spacing 정하고 Generate Lighting");
+        Debug.Log($"[ForestPack] {scene.name} 간접광 되돌림 · 해 {lights}개 Realtime · APV 볼륨 {volumes}개 · 구운 데이터 {bakedFiles.Count}개 삭제 · URP 에셋 {assets}개 Light Probe Groups → 씬 저장");
     }
 
     // 그래픽 품질 (목표 90fps 이상): 그림자 거리 40 → 60 · 캐스케이드 2 → 3. 직접 바꾼 값이 있으면 그대로 둠

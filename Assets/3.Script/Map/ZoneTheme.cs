@@ -75,7 +75,7 @@ public class ZoneTheme : ScriptableObject
     public float stairSize = 4f;
     public float stairYaw = 0f;         // 계단 프리팹 방향이 다르면 90 · 180으로 돌림
     public GameObject[] bridges;        // 북쪽 길 위를 가로지르는 나무다리 (구역마다 1개, 장식)
-    public bool placeBridges;           // [변경] 켜야 다리를 놓음
+    public bool placeBridges;           // 켜야 다리를 놓음
     public float bridgeSpan = 20f;
     public float bridgeClearance = 4f;  // 길 바닥에서 다리 아랫면까지 최소 높이
 
@@ -112,4 +112,20 @@ public class ZoneTheme : ScriptableObject
     public Material gateMaterial;
     public Material gateTrimMaterial;
     public Material gateBaseMaterial;
+
+    // [변경] 관상용 연못: 지형을 오목하게 파고 물면 · 물가 돌 · 풀을 둠. 위치는 구역 중심 기준
+    [System.Serializable]
+    public struct Pond
+    {
+        public Vector2 position; // x, z
+        public float radius;
+    }
+
+    [Header("Water")]
+    public Pond[] ponds;
+    public float pondDepth = 0.7f;
+    public Material waterMaterial;
+    public TerrainLayer pondLayer;   // 물가 젖은 흙
+    public GameObject[] pondStones;
+    public GameObject[] pondPlants;
 }

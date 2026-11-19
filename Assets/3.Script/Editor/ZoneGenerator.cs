@@ -300,6 +300,7 @@ public static class ZoneGenerator
         int cover = PlaceCover(theme, Group(generated, "Cover"), terrain);
         int stones = PlacePathStones(theme, Group(generated, "PathStones"), terrain);
         PlaceLandmarks(theme, Group(generated, "Landmarks"), terrain);
+        PlacePonds(theme, Group(generated, "Water"), terrain);
         PlaceParticles(theme, Group(generated, "Particles"), terrain);
         EnsureProbe(theme, generated.transform);
         if (applyAtmosphere) ApplyAtmosphere(theme);
@@ -339,6 +340,8 @@ public static class ZoneGenerator
         origin = theme.origin;
 
         Undo.RegisterCompleteObjectUndo(terrain.terrainData, "Repaint Zone");
+        Undo.RecordObject(terrain.transform, "Terrain Base");
+        terrain.transform.position = new Vector3(terrain.transform.position.x, origin.y - GroundBase(theme), terrain.transform.position.z); // 연못을 팔 만큼 지형을 내림
         WriteHeights(theme, terrain.terrainData); // 골짜기 · 비탈 등 높이도 다시 (공터 · 길 중심 높이는 그대로 0)
         PaintLayers(theme, terrain.terrainData);
         PaintDetails(theme, terrain.terrainData);
@@ -355,6 +358,7 @@ public static class ZoneGenerator
         int cover = PlaceCover(theme, Regroup(generated, "Cover"), terrain);
         int stones = PlacePathStones(theme, Regroup(generated, "PathStones"), terrain);
         PlaceLandmarks(theme, Regroup(generated, "Landmarks"), terrain); // 카툰 정자 → 테마 랜드마크
+        PlacePonds(theme, Regroup(generated, "Water"), terrain);
         PlaceParticles(theme, Regroup(generated, "Particles"), terrain);
         EnsureProbe(theme, generated);
 
@@ -427,7 +431,131 @@ public static class ZoneGenerator
         // 이웃 구역(시드 · 로컬 좌표가 다름)과 경계가 정확히 같아져 틈이 안 생김
         float toEdge = t.terrainSize * 0.5f - Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
         float seam = Cut(t, x, z, SeamHeight, plainFade);
-        return Mathf.Lerp(seam, h, Mathf.Clamp01(toEdge / SeamBand));
+        return Mathf.Lerp(seam, h, Mathf.Clamp01(toEdge / SeamBand)) - PondDent(t, x, z); // 연못은 구역 안쪽이라 이음매와 무관
+    }
+
+    // ===== 연못 =====
+    // 0 = 연못 중심, 1 = 물가. 방향마다 물가 반지름을 0.85~1.15배로 흔들어 둥근 접시 모양을 피함
+    static float PondDistance(ZoneTheme t, float x, float z)
+    {
+        float best = 99f;
+        if (t.ponds == null) return best;
+        for (int i = 0; i < t.ponds.Length; i++)
+        {
+            ZoneTheme.Pond p = t.ponds[i];
+            if (p.radius <= 0f) continue;
+            float dx = x - p.position.x, dz = z - p.position.y;
+            float a = Mathf.Atan2(dz, dx);
+            float shape = 0.85f + 0.3f * Mathf.PerlinNoise(Mathf.Cos(a) * 1.3f + t.seed * 0.7f + i * 5.1f, Mathf.Sin(a) * 1.3f + i * 3.3f);
+            best = Mathf.Min(best, Mathf.Sqrt(dx * dx + dz * dz) / (p.radius * shape));
+        }
+        return best;
+    }
+
+    static float PondDent(ZoneTheme t, float x, float z)
+    {
+        if (!HasPonds(t)) return 0f;
+        float d = PondDistance(t, x, z);
+        return t.pondDepth * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.55f, 1.15f, d))); // 바닥은 평평 · 가장자리는 완만
+    }
+
+    static bool HasPonds(ZoneTheme t) => t.ponds != null && t.ponds.Length > 0 && t.pondDepth > 0f;
+
+    // 연못을 파려면 지형 바닥이 공터(0)보다 낮아야 함 → 높이 값을 이만큼 올리고 지형을 이만큼 내림 (실제 높이는 그대로)
+    static float GroundBase(ZoneTheme t) => HasPonds(t) ? t.pondDepth + 0.3f : 0f;
+
+    static bool InPond(ZoneTheme t, Vector3 pos, float margin) =>
+        HasPonds(t) && t.ponds.Any(p => p.radius > 0f && new Vector2(pos.x - p.position.x, pos.z - p.position.y).magnitude < p.radius * 1.2f + margin);
+
+    // 물면(원판 메시) + 물가를 따라 듬성듬성 돌 · 풀. 물면은 물가보다 넓게 깔고 지형이 가장자리를 덮음
+    const float WaterLevel = -0.12f;
+
+    static void PlacePonds(ZoneTheme t, Transform parent, Terrain terrain)
+    {
+        if (!HasPonds(t)) return;
+        Mesh disc = WaterDisc();
+        for (int i = 0; i < t.ponds.Length; i++)
+        {
+            ZoneTheme.Pond p = t.ponds[i];
+            if (p.radius <= 0f) continue;
+            Vector3 center = new Vector3(p.position.x, 0f, p.position.y);
+
+            var water = new GameObject($"Pond_{i}");
+            water.transform.SetParent(parent, false);
+            water.transform.position = origin + center + Vector3.up * WaterLevel;
+            water.transform.localScale = Vector3.one * p.radius * 1.45f;
+            water.AddComponent<MeshFilter>().sharedMesh = disc;
+            var mr = water.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = t.waterMaterial;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            mr.receiveShadows = true;
+            water.AddComponent<PlanarWaterReflection>(); // 거울 반사
+
+            // 물가 = 방향마다 PondDistance가 1이 되는 거리
+            int stones = Mathf.RoundToInt(Mathf.PI * 2f * p.radius / 1.1f); // 더 촘촘 · 크게
+            for (int s = 0; s < stones && t.pondStones != null && t.pondStones.Length > 0; s++)
+            {
+                if (RangeF(0f, 1f) < 0.3f) continue; // 틈을 둬서 자연스럽게
+                float a = (s + RangeF(-0.3f, 0.3f)) / stones * Mathf.PI * 2f;
+                Vector3 pos = center + ShoreOffset(t, center, a) * RangeF(0.98f, 1.12f);
+                float size = RangeF(0f, 1f) < 0.15f ? RangeF(2f, 3f) : RangeF(0.7f, 1.7f);
+                GameObject go = Spawn(Pick(t.pondStones), parent, terrain, pos, size, false, size * 0.2f, true);
+                if (go != null) go.transform.rotation = Quaternion.Euler(RangeF(-12f, 12f), RangeF(0f, 360f), RangeF(-12f, 12f));
+            }
+            int plants = Mathf.RoundToInt(p.radius * 4.5f);
+            for (int s = 0; s < plants && t.pondPlants != null && t.pondPlants.Length > 0; s++)
+            {
+                float a = RangeF(0f, Mathf.PI * 2f);
+                Vector3 pos = center + ShoreOffset(t, center, a) * RangeF(1.05f, 1.35f);
+                Spawn(Pick(t.pondPlants), parent, terrain, pos, 0f, false, 0f, false);
+            }
+        }
+    }
+
+    // 연못 중심에서 a 방향 물가까지 (PondDistance 기준 이분 탐색)
+    static Vector3 ShoreOffset(ZoneTheme t, Vector3 center, float a)
+    {
+        Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+        float lo = 0f, hi = 30f;
+        for (int k = 0; k < 18; k++)
+        {
+            float mid = (lo + hi) * 0.5f;
+            Vector3 q = center + dir * mid;
+            if (PondDistance(t, q.x, q.z) < 1f) lo = mid; else hi = mid;
+        }
+        return dir * lo;
+    }
+
+    // 반지름 1 원판 (가운데 촘촘한 고리 5겹 · 둘레 48칸)
+    static Mesh WaterDisc()
+    {
+        string path = $"{DataFolder}/Water_Disc.asset";
+        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        if (mesh != null) return mesh;
+        mesh = new Mesh { name = "Water_Disc" };
+        const int seg = 48, rings = 5;
+        var verts = new List<Vector3> { Vector3.zero };
+        var tris = new List<int>();
+        for (int r = 1; r <= rings; r++)
+        for (int s = 0; s < seg; s++)
+        {
+            float a = s * Mathf.PI * 2f / seg;
+            verts.Add(new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (r / (float)rings));
+        }
+        for (int s = 0; s < seg; s++) { tris.Add(0); tris.Add(1 + (s + 1) % seg); tris.Add(1 + s); }
+        for (int r = 1; r < rings; r++)
+        for (int s = 0; s < seg; s++)
+        {
+            int a0 = 1 + (r - 1) * seg + s, a1 = 1 + (r - 1) * seg + (s + 1) % seg;
+            int b0 = a0 + seg, b1 = a1 + seg;
+            tris.AddRange(new[] { a0, a1, b1, a0, b1, b0 });
+        }
+        mesh.SetVertices(verts);
+        mesh.SetNormals(verts.Select(_ => Vector3.up).ToList());
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateBounds();
+        AssetDatabase.CreateAsset(mesh, path);
+        return mesh;
     }
 
     static float Cut(ZoneTheme t, float x, float z, float h, float fade)
@@ -444,7 +572,8 @@ public static class ZoneGenerator
     static void WriteHeights(ZoneTheme t, TerrainData data)
     {
         int res = t.hillRoughness > 0f ? 257 : 129; // 잔굴곡이 보이게 해상도 올림
-        float maxHeight = Mathf.Max(t.hillHeight * (t.hillRoughness > 0f ? 1.5f : 1f) + t.hillNoise + 1f, SeamHeight) + 2f;
+        float bottom = GroundBase(t);
+        float maxHeight = Mathf.Max(t.hillHeight * (t.hillRoughness > 0f ? 1.5f : 1f) + t.hillNoise + 1f, SeamHeight) + 2f + bottom;
         data.heightmapResolution = res;
         data.size = new Vector3(t.terrainSize, maxHeight, t.terrainSize);
 
@@ -455,7 +584,7 @@ public static class ZoneGenerator
         {
             float x = ix / (float)(res - 1) * t.terrainSize - half;
             float z = iz / (float)(res - 1) * t.terrainSize - half;
-            heights[iz, ix] = Height(t, x, z) / maxHeight;
+            heights[iz, ix] = (Height(t, x, z) + bottom) / maxHeight;
         }
         data.SetHeights(0, 0, heights);
     }
@@ -483,7 +612,7 @@ public static class ZoneGenerator
         ConfigureTerrain(go.GetComponent<Terrain>(), t);
         go.name = "Terrain";
         go.transform.SetParent(parent, false);
-        go.transform.position = origin + new Vector3(-half, 0f, -half);
+        go.transform.position = origin + new Vector3(-half, -GroundBase(t), -half);
         return go.GetComponent<Terrain>();
     }
 
@@ -494,6 +623,8 @@ public static class ZoneGenerator
         int extraIndex = -1, slopeIndex = -1; // 4 · 5번째 질감은 있을 때만
         if (t.extraLayer != null && t.extraAmount > 0f) { extraIndex = list.Count; list.Add(t.extraLayer); }
         if (t.slopeLayer != null) { slopeIndex = list.Count; list.Add(t.slopeLayer); }
+        int pondIndex = -1; // 물가 젖은 흙
+        if (t.pondLayer != null && HasPonds(t)) { pondIndex = list.Count; list.Add(t.pondLayer); }
         var layers = list.ToArray();
         if (layers.Any(l => l == null))
         {
@@ -533,13 +664,16 @@ public static class ZoneGenerator
             float slope = 0f;
             if (slopeIndex >= 0)
                 slope = Mathf.Clamp01((data.GetSteepness((ix + 0.5f) / res, (iz + 0.5f) / res) - 25f) / 15f);
-            float keep = (1f - slope) / sum;
+            float wet = pondIndex >= 0 ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1f, 1.6f, PondDistance(t, x, z))) : 0f;
+            slope *= 1f - wet;
+            float keep = (1f - slope - wet) / sum;
 
             maps[iz, ix, 0] = grass * keep;
             maps[iz, ix, 1] = arena * keep;
             maps[iz, ix, 2] = road * keep;
             if (extraIndex >= 0) maps[iz, ix, extraIndex] = extra * keep;
             if (slopeIndex >= 0) maps[iz, ix, slopeIndex] = slope;
+            if (pondIndex >= 0) maps[iz, ix, pondIndex] = wet;
         }
         data.SetAlphamaps(0, 0, maps);
     }
@@ -814,10 +948,10 @@ public static class ZoneGenerator
         terrain.heightmapPixelError = 1f;
         terrain.detailObjectDistance = t.detailDistance;
         terrain.detailObjectDensity = 1f;
-        PrepareForBakedLight(terrain); // [변경] 다시 생성해도 간접광 굽기 설정 유지
+        PrepareForBakedLight(terrain); // 다시 생성해도 간접광 굽기 설정 유지
     }
 
-    // [변경] 간접광(APV) 굽기용: 지형이 빛 반사에 참여(Contribute GI)하고, 받는 쪽은 라이트맵 대신 프로브로 → 굽기 빠르고 데이터 작음
+    // 간접광(APV) 굽기용: 지형이 빛 반사에 참여(Contribute GI)하고, 받는 쪽은 라이트맵 대신 프로브로 → 굽기 빠르고 데이터 작음
     // GPU 인스턴싱으로 지형 그리기 (드로우콜 감소)
     public static void PrepareForBakedLight(Terrain terrain)
     {
@@ -872,6 +1006,7 @@ public static class ZoneGenerator
             float flatK = 1f - Mathf.Clamp01((steep - 32f) / 10f);
             float patch = Mathf.PerlinNoise(x * 0.11f + t.seed * 1.3f, z * 0.11f + t.seed * 2.7f);
             float w = edge * (1f - road) * flatK * Mathf.Clamp01(patch * 1.7f - 0.25f) * t.detailDensity;
+            if (HasPonds(t)) w *= Mathf.InverseLerp(1.15f, 1.5f, PondDistance(t, x, z)); // 물 속 · 물가는 비움
             if (w <= 0.02f) continue;
 
             if (grassCount > 0)
@@ -974,7 +1109,7 @@ public static class ZoneGenerator
         for (int attempt = 0; attempt < t.innerRockCount * 10 && count < t.innerRockCount; attempt++)
         {
             Vector3 pos = RandomInRing(t.combatRadius + 0.5f, t.wallRadius - 1f);
-            if (InGate(t, pos, 1f)) continue;
+            if (InGate(t, pos, 1f) || InPond(t, pos, 1f)) continue;
             Spawn(Pick(t.innerRocks), parent, terrain, pos, Range(t.innerRockSize), false, 0.1f, true);
             count++;
         }
@@ -994,7 +1129,7 @@ public static class ZoneGenerator
         {
             Vector3 pos = new Vector3(RangeF(-half, half), 0f, RangeF(-half, half));
             float r = new Vector2(pos.x, pos.z).magnitude;
-            if (r < t.wallRadius + 2.5f) continue;
+            if (r < t.wallRadius + 2.5f || InPond(t, pos, 3f)) continue;
             if (InGate(t, pos, t.valleyWidth > 0f ? 4f : 2.5f)) continue; // 골짜기면 투명 벽 바로 뒤부터 숲
             if (placed.Any(p => (p - pos).sqrMagnitude < minSqr)) continue;
 
@@ -1008,7 +1143,7 @@ public static class ZoneGenerator
         for (int attempt = 0; attempt < t.innerTreeCount * 30 && inner < t.innerTreeCount; attempt++)
         {
             Vector3 pos = RandomInRing(t.combatRadius + 1.2f, t.wallRadius - 0.3f);
-            if (InGate(t, pos, 2.5f)) continue;
+            if (InGate(t, pos, 2.5f) || InPond(t, pos, 2f)) continue;
             if (placed.Any(p => (p - pos).sqrMagnitude < innerMinSqr)) continue;
             placed.Add(pos);
             Spawn(Pick(t.trees), parent, terrain, pos, Range(t.treeHeight), true, 0.2f, true);
@@ -1025,7 +1160,9 @@ public static class ZoneGenerator
         {
             for (int i = 0; i < t.arenaCoverCount; i++)
             {
-                Spawn(Pick(t.arenaCover), parent, terrain, RandomInRing(1.5f, t.combatRadius - 0.5f), 0f, false, 0f, false);
+                Vector3 pos = RandomInRing(1.5f, t.combatRadius - 0.5f);
+                if (InPond(t, pos, 0.3f)) continue;
+                Spawn(Pick(t.arenaCover), parent, terrain, pos, 0f, false, 0f, false);
                 count++;
             }
         }
@@ -1035,7 +1172,7 @@ public static class ZoneGenerator
             for (int attempt = 0; attempt < t.outerCoverCount * 5 && count < t.arenaCoverCount + t.outerCoverCount; attempt++)
             {
                 Vector3 pos = RandomInRing(t.wallRadius + 0.5f, t.wallRadius + Mathf.Max(1f, t.outerCoverReach)); // 띠 폭을 테마에서
-                if (InGate(t, pos, 0.5f)) continue;
+                if (InGate(t, pos, 0.5f) || InPond(t, pos, 0.3f)) continue;
                 Spawn(Pick(t.outerCover), parent, terrain, pos, 0f, false, 0f, false);
                 count++;
             }
@@ -1123,7 +1260,7 @@ public static class ZoneGenerator
             for (float d = t.wallRadius + 1.5f; d < end; d += t.pathStoneSpacing)
             {
                 Vector3 pos = dir * d + side * (Meander(t, d) + RangeF(-0.6f, 0.6f)); // 굽은 길 따라
-                Spawn(Pick(t.pathStones), parent, terrain, pos, t.pathStoneSize, false, 0.05f, false);
+                Spawn(Pick(t.pathStones), parent, terrain, pos, t.pathStoneSize, false, 0.08f, true); // [변경] 밟고 지나가게 충돌 유지
                 count++;
             }
         }

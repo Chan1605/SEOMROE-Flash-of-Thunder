@@ -185,3 +185,9 @@ MonoBehaviour:
   gateMaterial: {fileID: 2100000, guid: 5c112baaca4454e4d88d9f4cfcf08c03, type: 2}
   gateTrimMaterial: {fileID: 2100000, guid: 1ed7998a193c26e459a799e0d62888ca, type: 2}
   gateBaseMaterial: {fileID: 2100000, guid: 77000f1dc854d29408d5c9deeec24f80, type: 2}
+  ponds: []
+  pondDepth: 0.7
+  waterMaterial: {fileID: 0}
+  pondLayer: {fileID: 0}
+  pondStones: []
+  pondPlants: []

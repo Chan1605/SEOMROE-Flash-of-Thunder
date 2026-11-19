@@ -185,3 +185,28 @@ MonoBehaviour:
   gateMaterial: {fileID: 2100000, guid: 5c112baaca4454e4d88d9f4cfcf08c03, type: 2}
   gateTrimMaterial: {fileID: 2100000, guid: 1ed7998a193c26e459a799e0d62888ca, type: 2}
   gateBaseMaterial: {fileID: 2100000, guid: 77000f1dc854d29408d5c9deeec24f80, type: 2}
+  ponds:
+  - position: {x: 18, y: 3}
+    radius: 6.5
+  pondDepth: 0.7
+  waterMaterial: {fileID: 2100000, guid: 9f6aa0a0bf0e6ad4ea6dbe28145cf621, type: 2}
+  pondLayer: {fileID: 8574412962073106934, guid: ef0b183765135b64d80adee5c961998b, type: 2}
+  pondStones:
+  - {fileID: 8745562623447073471, guid: 244fe7240ba55ae4aab622581df24828, type: 3}
+  - {fileID: 1236898795652179981, guid: 4de5798c58a725e45b59a64a9cbae3d8, type: 3}
+  - {fileID: 124529913939545404, guid: c1836178b61f5254cb4a664b29e0d5ab, type: 3}
+  - {fileID: 4296641989554866986, guid: 4874f83364e7c64458dded565ba8ef72, type: 3}
+  - {fileID: 7046631540937994666, guid: fd7869b37f2a04649925a66f439e4d23, type: 3}
+  - {fileID: 3218859338934444687, guid: a99bc79ba00cffc45aac0ca501d572e5, type: 3}
+  - {fileID: 580224869951649583, guid: f2a0834c084ba2c4c946b63903d45b9f, type: 3}
+  - {fileID: 7775791737395211612, guid: cccbc50d35fd3ab4fa5f0f1b5f730051, type: 3}
+  - {fileID: 5440648434039081930, guid: ea3d7c31eacb8344ab6bf393a376a1dc, type: 3}
+  - {fileID: 6608502843660117147, guid: 4cc70b80664d31741b0b2ca8b98274f9, type: 3}
+  pondPlants:
+  - {fileID: 156335607043850256, guid: cc7179a2ce65745459790f57a231a7d8, type: 3}
+  - {fileID: 1298218015822933112, guid: 193204491f653e241bf50074d9dad010, type: 3}
+  - {fileID: 8632977291124583399, guid: 9ff96c23a39dbd84ba03d2b381dd8e57, type: 3}
+  - {fileID: 5001871497718003202, guid: 7a35ad4df6bb0404493e2f034e968eae, type: 3}
+  - {fileID: 7243209615218423865, guid: 4bf5c9392e6410f4285e07b62126ba5f, type: 3}
+  - {fileID: 8658205388212818215, guid: 083ddbae69cc6814fa0103896e42ca98, type: 3}
+  - {fileID: 436777448057077585, guid: a9e367353bdc80842874b8462a935198, type: 3}

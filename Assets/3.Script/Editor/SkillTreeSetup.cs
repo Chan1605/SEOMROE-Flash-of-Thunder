@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -41,7 +42,7 @@ public static class SkillTreeSetup
         var data = AssetDatabase.LoadAssetAtPath<SkillTreeData>(DataPath);
         if (data != null)
         {
-            // [변경] 새로 추가된 기본 노드(수련 탭 등)를 기존 에셋에 덧붙임. 고친 이름·비용은 그대로
+            // 새로 추가된 기본 노드(수련 탭 등)를 기존 에셋에 덧붙임. 고친 이름·비용은 그대로
             int before = data.nodes.Count;
             data.nodes = SkillTreeData.WithMissingDefaults(data.nodes);
             if (data.nodes.Count != before)
@@ -127,7 +128,8 @@ public static class SkillTreeSetup
 
         GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
         Object.DestroyImmediate(root);
-        return prefab;
+        MapDressing.RebuildShrineLook(); // [변경] 처음 만들 때도 화톳불 모양으로
+        return AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
     }
 
     static void Part(GameObject root, PrimitiveType type, string name, Vector3 position, Vector3 scale, Material material, bool keepCollider)
@@ -158,9 +160,20 @@ public static class SkillTreeSetup
         return mat;
     }
 
+    // InGame 화톳불 위치 고정 (11/19 사용자가 직접 맞춘 값). 셋업을 다시 돌려도 이 자리 · 방향으로 맞춤
+    static readonly Dictionary<string, (Vector3 position, float yaw)> FixedShrines = new Dictionary<string, (Vector3, float)>
+    {
+        { "Shrine (Zone_1_Sanmun)", (new Vector3(2.5f, 0.483858f, -20.9f), -90f) },
+        { "Shrine (Zone_2_Forest)", (new Vector3(3.1f, 0f, 85.92f), -90f) },
+        { "Shrine (Zone_3_Temple)", (new Vector3(0.87f, 0f, 199.9f), -90f) },
+        { "Shrine (Zone_4_Boss)", (new Vector3(2.66f, 0f, 310.53f), -90f) },
+        { "Shrine (Zone_3_Trial)", (new Vector3(1.8f, 0f, 427.5f), -90f) },
+    };
+
     // 각 구역 RespawnPoint 앞 오른쪽에 하나씩 (구역을 다시 생성해도 지워지지 않게 씬 루트 "Shrines" 아래)
     static int PlaceShrines(GameObject prefab)
     {
+        bool inGame = EditorSceneManager.GetActiveScene().name == "InGame";
         Transform[] respawns = Object.FindObjectsByType<Transform>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)
             .Where(t => t.name == "RespawnPoint").ToArray();
         Shrine[] existing = Object.FindObjectsByType<Shrine>(FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -175,14 +188,34 @@ public static class SkillTreeSetup
         int placed = 0;
         foreach (Transform r in respawns)
         {
-            Vector3 pos = r.position + r.forward * 2.5f + r.right * 2f;
-            if (existing.Any(s => (s.transform.position - pos).sqrMagnitude < 36f)) continue;
-
-            if (Physics.Raycast(pos + Vector3.up * 20f, Vector3.down, out RaycastHit hit, 60f, ~0, QueryTriggerInteraction.Ignore)) pos = hit.point;
-            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, group.transform);
-            go.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(-r.right, Vector3.up));
             Transform zone = r.parent != null && r.parent.parent != null ? r.parent.parent : r.parent;
-            go.name = zone != null ? $"Shrine ({zone.name})" : "Shrine";
+            string name = zone != null ? $"Shrine ({zone.name})" : "Shrine";
+            (Vector3 position, float yaw) fixedSpot = default;
+            bool hasFixed = inGame && FixedShrines.TryGetValue(name, out fixedSpot);
+
+            // 같은 이름 화톳불이 이미 있으면 새로 만들지 않음 (고정 위치가 있으면 그 자리로 되돌림)
+            Shrine same = existing.FirstOrDefault(s => s.name == name);
+            if (same != null)
+            {
+                if (hasFixed)
+                {
+                    Undo.RecordObject(same.transform, "Fix Shrine");
+                    same.transform.SetPositionAndRotation(fixedSpot.position, Quaternion.Euler(0f, fixedSpot.yaw, 0f));
+                }
+                continue;
+            }
+
+            Vector3 pos = r.position + r.forward * 2.5f + r.right * 2f;
+            Quaternion rot = Quaternion.LookRotation(-r.right, Vector3.up);
+            if (hasFixed) { pos = fixedSpot.position; rot = Quaternion.Euler(0f, fixedSpot.yaw, 0f); }
+            else
+            {
+                if (existing.Any(s => (s.transform.position - pos).sqrMagnitude < 36f)) continue;
+                if (Physics.Raycast(pos + Vector3.up * 20f, Vector3.down, out RaycastHit hit, 60f, ~0, QueryTriggerInteraction.Ignore)) pos = hit.point;
+            }
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, group.transform);
+            go.transform.SetPositionAndRotation(pos, rot);
+            go.name = name;
             Undo.RegisterCreatedObjectUndo(go, "Shrine");
             placed++;
         }
