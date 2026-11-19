@@ -1757,9 +1757,9 @@ MonoBehaviour:
   dischargePerHit: 1.5
   dischargeMaxBonus: 40
   waveClips:
-  - {fileID: 8300000, guid: 2ca181a6beda412ba877f9352a7802eb, type: 3}
-  - {fileID: 8300000, guid: 55a17967170e4e1eb08bba277c1533c6, type: 3}
-  - {fileID: 8300000, guid: 378fd9c765574e5f8942e21071177833, type: 3}
+  - {fileID: 8300000, guid: 38c130d402c4a114c8076db2b27a80c0, type: 3}
+  - {fileID: 8300000, guid: 38c130d402c4a114c8076db2b27a80c0, type: 3}
+  - {fileID: 8300000, guid: 38c130d402c4a114c8076db2b27a80c0, type: 3}
   waveVolume: 0.5
   waveMinGap: 0.07
   finisherChargeClip: {fileID: 8300000, guid: bea4c3a321e147dd8bfcb8419ae01da3, type: 3}
@@ -1950,13 +1950,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3ced6db98785e44ea77718b1bfce350, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerClothFlutter
-  clothMeshes:
-  - hakama
+  flutterMeshes:
   - fabric
   - belt1
   - belt2
-  clothFree:
-  - 0.16
+  flutterFree:
   - 0.26
   - 0.24
   - 0.24
@@ -2005,8 +2003,8 @@ MonoBehaviour:
   dustColor: {r: 0.55, g: 0.5, b: 0.42, a: 0.4}
   splashColor: {r: 0.75, g: 0.85, b: 0.9, a: 0.7}
   stepDustMinPace: 0.55
-  stepDust: 3
-  dodgeDust: 12
+  stepDust: 10
+  dodgeDust: 20
   landDust: 10
   landAirTime: 0.35
 --- !u!1 &1515010326207606855

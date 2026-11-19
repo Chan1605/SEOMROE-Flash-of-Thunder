@@ -11,6 +11,8 @@ public class PlayerFootsteps : MonoBehaviour
     const float MinInterval = 0.12f;  // 두 발이 거의 동시에 닿아도 한 번만
 
     AudioClip[] clips;
+    AudioClip[] waterClips; // [변경] 연못 안 발소리 (Resources/Audio/Footsteps/water_step_*)
+    int lastWaterClip = -1;
     float volume, runSpeed;
     Vector2 pitch;
     Animator animator;
@@ -31,7 +33,7 @@ public class PlayerFootsteps : MonoBehaviour
         runSpeed = Mathf.Max(0.1f, fullVolumeSpeed);
     }
 
-    public event System.Action<Vector3, float> Planted; // [변경] 발 위치 · 빠르기(0~1) → 발밑 먼지 · 물 튐
+    public event System.Action<Vector3, float> Planted; // 발 위치 · 빠르기(0~1) → 발밑 먼지 · 물 튐
 
     void Start()
     {
@@ -42,6 +44,7 @@ public class PlayerFootsteps : MonoBehaviour
             feet[0] = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
             feet[1] = animator.GetBoneTransform(HumanBodyBones.RightFoot);
         }
+        waterClips = System.Array.FindAll(Resources.LoadAll<AudioClip>("Audio/Footsteps"), c => c.name.StartsWith("water_step"));
         var go = new GameObject("Sfx_Footsteps");
         go.transform.SetParent(transform, false);
         source = go.AddComponent<AudioSource>();
@@ -77,22 +80,25 @@ public class PlayerFootsteps : MonoBehaviour
                 lifted[i] = false;
                 if (moving && Time.time - lastStepTime >= MinInterval)
                 {
-                    Play();
+                    Play(feet[i].position);
                     Planted?.Invoke(feet[i].position, Mathf.Clamp01(speed / runSpeed));
                 }
             }
         }
     }
 
-    void Play()
+    void Play(Vector3 foot)
     {
         lastStepTime = Time.time;
-        int i = Random.Range(0, clips.Length);
-        if (clips.Length > 1 && i == lastClip) i = (i + 1) % clips.Length;
-        lastClip = i;
-        if (clips[i] == null) return;
+        bool water = waterClips != null && waterClips.Length > 0 && PlanarWaterReflection.FindWater(foot, out _);
+        AudioClip[] set = water ? waterClips : clips;
+        int last = water ? lastWaterClip : lastClip;
+        int i = Random.Range(0, set.Length);
+        if (set.Length > 1 && i == last) i = (i + 1) % set.Length;
+        if (water) lastWaterClip = i; else lastClip = i;
+        if (set[i] == null) return;
         float pace = Mathf.Lerp(0.45f, 1f, Mathf.Clamp01(speed / runSpeed));
         source.pitch = Random.Range(pitch.x, pitch.y);
-        source.PlayOneShot(clips[i], volume * pace * AudioOptions.SfxVolume);
+        source.PlayOneShot(set[i], volume * pace * AudioOptions.SfxVolume);
     }
 }

@@ -1,4 +1,4 @@
-#pragma warning disable 0414 // [변경] 낙뢰 스타일 · 번짐 배율은 입체 낙뢰로 바뀌어 안 쓰지만, 저장된 값은 남겨 둠
+#pragma warning disable 0414 // 낙뢰 스타일 · 번짐 배율은 입체 낙뢰로 바뀌어 안 쓰지만, 저장된 값은 남겨 둠
 using System.Collections;
 using System.Collections.Generic;
 using DigitalRuby.ThunderAndLightning;
@@ -130,11 +130,12 @@ public class ParryFx : MonoBehaviour
         cam = Camera.main;
         block = new MaterialPropertyBlock();
 
-        audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource = new GameObject("Sfx_Parry").AddComponent<AudioSource>(); // [변경] 루트 대신 자식 (다른 소리처럼)
+        audioSource.transform.SetParent(transform, false);
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
 
-        // [변경] 낙뢰는 입체 낙뢰(ThunderBolt3D)로 바뀌어 낙뢰용 번개는 만들지 않음
+        // 낙뢰는 입체 낙뢰(ThunderBolt3D)로 바뀌어 낙뢰용 번개는 만들지 않음
         bladeBolt = LightningFactory.Create(boltPrefab, "KanpaBladeLightning", bladeSparkStyle);
         WeaponHitbox weapon = GetComponentInChildren<WeaponHitbox>(true);
         if (weapon != null) blade = weapon.GetComponent<BoxCollider>();
@@ -210,7 +211,7 @@ public class ParryFx : MonoBehaviour
         SpawnRing(point, outer, outerRingSize * size, outerRingTime, 0.22f * size);
         if (vig != null) vig.color.value = vignetteTint;
 
-        if (strike) ThunderBolt3D.Strike(enemy.transform.position + Vector3.up * strikeHeight, enemy.transform.position, 0.9f, 2); // [변경] 입체 낙뢰
+        if (strike) ThunderBolt3D.Strike(enemy.transform.position + Vector3.up * strikeHeight, enemy.transform.position, 0.9f, 2); // 입체 낙뢰
 
         float v = volume * AudioOptions.SfxVolume; // 효과음 볼륨 설정 반영
         if (clashClip != null) audioSource.PlayOneShot(clashClip, v);
@@ -361,7 +362,7 @@ public class ParryFx : MonoBehaviour
     void OnSmashLanded(Vector3 center)
     {
         Vector3 ground = center + Vector3.up * 0.2f;
-        ThunderBolt3D.Strike(center + Vector3.up * strikeHeight, center, 1.1f, 3); // [변경] 입체 낙뢰
+        ThunderBolt3D.Strike(center + Vector3.up * strikeHeight, center, 1.1f, 3); // 입체 낙뢰
         SpawnRing(ground, smashRingColor, smashRingSize, 0.35f, 0.25f);
         SpawnRing(ground, innerRingColor, smashRingSize * 0.6f, 0.2f, 0.08f);
         if (followCamera != null)

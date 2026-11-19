@@ -12337,9 +12337,9 @@ MonoBehaviour:
     goal: 4
     count: 1
     title: "\uC644\uBCBD \uD68C\uD53C"
-    description: "\uC218\uB828 \uC0C1\uB300\uAC00 \uB098\uC654\uC2B5\uB2C8\uB2E4.
-      \uACF5\uACA9\uC774 \uB2FF\uAE30 \uC9C1\uC804\uC5D0 \uD68C\uD53C\uD558\uBA74
-      \uC2DC\uAC04\uC774 \uB290\uB824\uC9C0\uACE0 \uB1CC\uAE30 1\uCE78\uC744 \uC5BB\uC2B5\uB2C8\uB2E4."
+    description: "\uACF5\uACA9\uC774 \uB2FF\uAE30 \uC9C1\uC804\uC5D0 \uD68C\uD53C\uD558\uBA74
+      \uC2DC\uAC04\uC774 \uB290\uB824\uC9C0\uACE0 \uB1CC\uAE30 1\uCE78\uC744 \uC5BB\uC2B5\uB2C8\uB2E4.\nTip.\uB77D\uC628\uC73C\uB85C
+      \uACE0\uC815\uD558\uACE0 \uD68C\uD53C\uD558\uC138\uC694."
     keys: "Shift (\uD0C0\uC774\uBC0D)"
     fillGauge: 0
     skippable: 1
@@ -12381,7 +12381,7 @@ MonoBehaviour:
     description: "Q\uB97C \uC9E7\uAC8C \uB204\uB974\uBA74 \uAC00\uAE4C\uC6B4 \uC801\uC5D0\uAC8C
       \uBC88\uAC1C\uCC98\uB7FC \uB3CC\uC9C4\uD574 \uBCB1\uB2C8\uB2E4. \uB1CC\uAE30
       1\uCE78 \uC18C\uBAA8"
-    keys: "Q \uD0ED"
+    keys: Q
     fillGauge: 1
     skippable: 0
   - chapter: 2
@@ -12401,7 +12401,7 @@ MonoBehaviour:
     count: 3
     title: "\uAC01\uC131"
     description: "\uB1CC\uAE30 2\uCE78 \uC774\uC0C1\uC5D0\uC11C R. \uAC01\uC131 \uC911\uC5D4
-      \uD3C9\uD0C0\uB9C8\uB2E4 \uB099\uB8B0\uAC00 \uB5A8\uC5B4\uC9D1\uB2C8\uB2E4."
+      \uD3C9\uD0C0\uB9C8\uB2E4 \uAC80\uAE30\uAC00 \uC0DD\uC131\uB429\uB2C8\uB2E4."
     keys: "R \u2192 \uC88C\uD074\uB9AD"
     fillGauge: 1
     skippable: 0
@@ -12410,9 +12410,8 @@ MonoBehaviour:
     goal: 12
     count: 1
     title: "\uD734\uC2DD"
-    description: "\uC218\uB828\uC7A5 \uAC00\uC7A5\uC790\uB9AC\uC758 \uC624\uBE0C\uC81D\uD2B8
-      \uC55E\uC5D0\uC11C E. \uCCB4\uB825\uC774 \uD68C\uBCF5\uB418\uACE0 \uC2A4\uD0AC\uD2B8\uB9AC\uAC00
-      \uC5F4\uB9BD\uB2C8\uB2E4."
+    description: "\uC624\uBE0C\uC81D\uD2B8 \uC55E\uC5D0\uC11C E. \uCCB4\uB825\uC774
+      \uD68C\uBCF5\uB418\uACE0 \uC2A4\uD0AC\uD2B8\uB9AC\uAC00 \uC5F4\uB9BD\uB2C8\uB2E4."
     keys: E
     fillGauge: 0
     skippable: 0
@@ -12422,15 +12421,14 @@ MonoBehaviour:
     count: 1
     title: "\uC2A4\uD0AC \uD574\uAE08"
     description: "\uC2A4\uD0AC \uD3EC\uC778\uD2B8\uB85C \uAE30\uC220\uC744 \uD558\uB098
-      \uD574\uAE08\uD558\uC138\uC694. \uC2A4\uD0AC\uC744 \uACE0\uB974\uBA74 \uBBF8\uB9AC\uBCF4\uAE30
-      \uC601\uC0C1\uC774 \uB098\uC635\uB2C8\uB2E4."
+      \uD574\uAE08\uD558\uC138\uC694."
     keys: "\uD074\uB9AD \u2192 \uD574\uAE08"
     fillGauge: 0
     skippable: 0
   titleFont: {fileID: 12800000, guid: 3117e2d6251c9154fb4945680a341259, type: 3}
   bodyFont: {fileID: 12800000, guid: ca81aa27ea10c624487ee1849d77e491, type: 3}
   comboGap: 1.2
-  skipAfter: 30
+  skipAfter: 15
   stepDelay: 0.9
   skipKey: 2
 --- !u!4 &444959806
@@ -26953,7 +26951,7 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 1885940809510095838, guid: f152d92f6ac839a49b38617c0bb78c31, type: 3}
+    - targetCorrespondingSourceObject: {fileID: 5478303050101656398, guid: f152d92f6ac839a49b38617c0bb78c31, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1027700502}
   m_SourcePrefab: {fileID: 100100000, guid: f152d92f6ac839a49b38617c0bb78c31, type: 3}
@@ -26964,7 +26962,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &1027700501 stripped
 GameObject:
-  m_CorrespondingSourceObject: {fileID: 1885940809510095838, guid: f152d92f6ac839a49b38617c0bb78c31, type: 3}
+  m_CorrespondingSourceObject: {fileID: 5478303050101656398, guid: f152d92f6ac839a49b38617c0bb78c31, type: 3}
   m_PrefabInstance: {fileID: 1027700499}
   m_PrefabAsset: {fileID: 0}
 --- !u!114 &1027700502
@@ -55747,7 +55745,7 @@ MonoBehaviour:
   m_IsGlobal: 1
   priority: 5
   blendDistance: 0
-  weight: 1
+  weight: 0.93333334
   sharedProfile: {fileID: 11400000, guid: 91ca9fbe42ff35c46825027c71bb6615, type: 2}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

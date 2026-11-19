@@ -85,7 +85,8 @@ public partial class PlayerUltimate : MonoBehaviour
         afterimage = GetComponentInChildren<PlayerAfterimage>();
         stance = GetComponent<PlayerStance>();
 
-        audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource = new GameObject("Sfx_Ultimate").AddComponent<AudioSource>(); // [변경] 루트 대신 자식 (다른 소리처럼)
+        audioSource.transform.SetParent(transform, false);
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
         fx = new GameObject("UltimateFx").AddComponent<UltimateFx>();
@@ -147,7 +148,7 @@ public partial class PlayerUltimate : MonoBehaviour
             Vector2 a = Random.insideUnitCircle.normalized * Random.Range(0.6f, 1.4f);
             Arc(transform.position + new Vector3(a.x, 0.05f, a.y), Chest + Vector3.up * Random.Range(-0.3f, 0.6f));
         }
-        if (full && followCamera != null) followCamera.Shake(0.08f, 0.15f); // [변경] 칸이 찰 때 나던 소리는 뺌
+        if (full && followCamera != null) followCamera.Shake(0.08f, 0.15f); // 칸이 찰 때 나던 소리는 뺌
     }
 
     void Update()
