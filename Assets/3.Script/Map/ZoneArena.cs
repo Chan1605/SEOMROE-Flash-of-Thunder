@@ -122,7 +122,7 @@ public class ZoneArena : MonoBehaviour
         {
             int n = 0;
             foreach (EnemySwordsman e in current)
-                if (e != null && e.CanBeTargeted) n++;
+                if (e != null && e.IsAlive) n++; // [변경] 숨은 보스를 쓰러진 것으로 세지 않게
             return n;
         }
     }
@@ -275,7 +275,7 @@ public class ZoneArena : MonoBehaviour
             look.y = 0f;
             GameObject go = Instantiate(prefabs[i], pos, Quaternion.LookRotation(look.normalized, Vector3.up));
             var enemy = go.GetComponent<EnemySwordsman>();
-            if (theme != null) enemy.MultiplyScaling(theme.strength); // [변경] 구역 강도 (중간보스 · 시련 배율은 아래에서 덮어씀)
+            if (theme != null) enemy.MultiplyScaling(theme.strength); // 구역 강도 (중간보스 · 시련 배율은 아래에서 덮어씀)
             AnyEnemyCreated?.Invoke(this, enemy);
             enemy.DisableRespawn();
             enemy.MarkTemporary(); // 쓰러지면 가라앉아 사라짐 (미리 둔 적은 재시작 때 되살려야 하므로 제외)
@@ -323,7 +323,7 @@ public class ZoneArena : MonoBehaviour
     bool AllDefeated()
     {
         foreach (EnemySwordsman e in current)
-            if (e != null && e.CanBeTargeted) return false;
+            if (e != null && e.IsAlive) return false; // [변경] CanBeTargeted는 등장 전 보스를 false로 봐서 구역이 바로 클리어되고 사망 부활이 막혔음
         return true;
     }
 
@@ -435,7 +435,7 @@ public class ZoneArena : MonoBehaviour
         if (activeAtmosphere != null && activeAtmosphere.atmosphereRoutine != null) activeAtmosphere.StopCoroutine(activeAtmosphere.atmosphereRoutine);
         activeAtmosphere = this;
         atmosphereRoutine = StartCoroutine(BlendAtmosphere(blendTime));
-        EnemySwordsman.MaxAttackers = theme != null ? Mathf.Max(1, theme.maxAttackers) : 2; // [변경] 구역별 동시 공격 수
+        EnemySwordsman.MaxAttackers = theme != null ? Mathf.Max(1, theme.maxAttackers) : 2; // 구역별 동시 공격 수
         AnyEntered?.Invoke(this); // 구역 이름 배너
     }
 

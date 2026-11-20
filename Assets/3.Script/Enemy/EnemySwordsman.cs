@@ -81,7 +81,8 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
     bool respawnEnabled = true; // 구역 웨이브로 나온 적은 부활하지 않음
     bool alerted;               // 감지 거리와 상관없이 플레이어를 쫓음
 
-    public bool CanBeTargeted => state != State.Dead && state != State.BossIntro && !awaitingIntro; // [변경] 포탈에서 나오기 전(숨은 보스)은 락온 대상 아님
+    public bool CanBeTargeted => state != State.Dead && state != State.BossIntro && !awaitingIntro; // 포탈에서 나오기 전(숨은 보스)은 락온 대상 아님
+    public bool IsAlive => state != State.Dead; // [변경] 구역 클리어 판정용 — 숨은 보스 · 등장 연출 중에도 살아 있음
     public bool IsWindingUp => state == State.Windup;
     public bool IsSwinging => swingActive;
     public event System.Action<EnemySwordsman> Died;
@@ -191,7 +192,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         InitBoss();
         InitTactics(player); // 플레이어 공격 시작을 듣고 회피 · 끼어들기
         InitBossSkills();    // 보스 소리 · 2페이즈 분위기
-        HideUntilIntro();    // [변경] 첫 등장 전엔 몸을 숨겨 둠 (본편에서 서 있다가 포탈에서 또 나오던 문제)
+        HideUntilIntro();    // 첫 등장 전엔 몸을 숨겨 둠 (본편에서 서 있다가 포탈에서 또 나오던 문제)
         if (animator != null && IsGuardian) PlayMoveState(0f);
     }
 

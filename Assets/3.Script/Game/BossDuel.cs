@@ -52,7 +52,7 @@ public class BossDuel : MonoBehaviour
             if (kb.f5Key.wasPressedThisFrame) Begin();
             if (kb.f6Key.wasPressedThisFrame && boss != null && boss.CanBeTargeted)
             {
-                boss.DebugSetHealth01(0.03f); // [변경] 2페이즈는 1페이즈 체력을 다 깎으면 시작 → 거의 다 깎인 상태로
+                boss.DebugSetHealth01(0.03f); // 2페이즈는 1페이즈 체력을 다 깎으면 시작 → 거의 다 깎인 상태로
                 Show("2페이즈 직전으로", 2f);
             }
         }
@@ -115,7 +115,7 @@ public class BossDuel : MonoBehaviour
         if (boss != null)
         {
             boss.Died -= OnBossDied;
-            if (boss.CanBeTargeted) Destroy(boss.gameObject); // 쓰러진 보스는 스스로 가라앉아 사라짐
+            if (boss.IsAlive) Destroy(boss.gameObject); // [변경] 등장 전 숨은 보스도 제거 (쓰러진 보스는 스스로 가라앉아 사라짐)
         }
         boss = null;
         foreach (GameObject go in hidden)
