@@ -130,7 +130,7 @@ public class ParryFx : MonoBehaviour
         cam = Camera.main;
         block = new MaterialPropertyBlock();
 
-        audioSource = new GameObject("Sfx_Parry").AddComponent<AudioSource>(); // [변경] 루트 대신 자식 (다른 소리처럼)
+        audioSource = new GameObject("Sfx_Parry").AddComponent<AudioSource>(); // 루트 대신 자식 (다른 소리처럼)
         audioSource.transform.SetParent(transform, false);
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
@@ -178,8 +178,15 @@ public class ParryFx : MonoBehaviour
     }
 
     // 색 묶음을 넘겨 패링=붉은색, 간파=청백
-    void OnParryClashed(GameObject enemy, Vector3 point) =>
+    void OnParryClashed(GameObject enemy, Vector3 point)
+    {
+        if (enemy != null && enemy.GetComponent<BossSwordWave>() != null) // [변경] 보스 검기 패링은 역뢰(간파) 소리 · 연출로
+        {
+            OnKanpaClashed(enemy, point);
+            return;
+        }
         Play(enemy, point, parryStrength, parryStrike, null, innerRingColor, outerRingColor, vignetteColor);
+    }
     void OnKanpaClashed(GameObject enemy, Vector3 point) =>
         Play(enemy, point, 1f, kanpaStrike, kanpaClip, kanpaInnerRingColor, kanpaOuterRingColor, kanpaVignetteColor); // 낙뢰는 뇌락에서
 
