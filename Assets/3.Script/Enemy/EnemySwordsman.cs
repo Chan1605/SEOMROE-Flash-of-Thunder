@@ -82,7 +82,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
     bool alerted;               // 감지 거리와 상관없이 플레이어를 쫓음
 
     public bool CanBeTargeted => state != State.Dead && state != State.BossIntro && !awaitingIntro; // 포탈에서 나오기 전(숨은 보스)은 락온 대상 아님
-    public bool IsAlive => state != State.Dead; // [변경] 구역 클리어 판정용 — 숨은 보스 · 등장 연출 중에도 살아 있음
+    public bool IsAlive => state != State.Dead; // 구역 클리어 판정용 — 숨은 보스 · 등장 연출 중에도 살아 있음
     public bool IsWindingUp => state == State.Windup;
     public bool IsSwinging => swingActive;
     public event System.Action<EnemySwordsman> Died;
@@ -312,6 +312,7 @@ public partial class EnemySwordsman : MonoBehaviour, IDamageable, IAttackThreat,
         }
 
         if (swingActive) EndSwing();
+        comboHit = state == State.Attack ? comboHit + 1 : 0; // [변경] 연타 몇 번째 타인지 (패링 예고는 첫 타만)
         currentAttack = attack;
         stepTraveled = 0f;
         windupScale = 1f; // 회피 반격 · 달려들기 · 끼어들기의 짧은 예고는 이번 한 번만

@@ -18,13 +18,17 @@ public class ThunderBolt3D : MonoBehaviour
     static readonly Color GlowColor = new Color(0.55f, 0.7f, 1.5f, 0.13f); // 옅게
     static Material coreMaterial, glowMaterial;
 
-    // [변경] 보스 흑뢰 전용 검붉은 번개: 검은 심 + 붉은 빛 껍질 / 붉은 심 + 검은 껍질 두 가지를 섞어 씀
+    // 보스 흑뢰 전용 검붉은 번개: 검은 심 + 붉은 빛 껍질 / 붉은 심 + 검은 껍질 두 가지를 섞어 씀
     static readonly Color DarkCoreA = new Color(0.04f, 0f, 0.01f, 1f);
     static readonly Color DarkGlowA = new Color(2.2f, 0.12f, 0.06f, 0.35f);
     static readonly Color DarkCoreB = new Color(2.6f, 0.18f, 0.08f, 1f);
     static readonly Color DarkGlowB = new Color(0.02f, 0f, 0f, 0.55f);
     static readonly Color DarkFlash = new Color(1f, 0.2f, 0.12f);
     static readonly Color BlueFlash = new Color(0.65f, 0.75f, 1f);
+    // [변경] 뇌신참 금빛 번개: 금빛 심 + 푸른 껍질 / 푸른 흰 심 + 금빛 껍질을 섞어 씀
+    static readonly Color GoldCore = new Color(3.4f, 2.6f, 0.9f, 1f);
+    static readonly Color GoldGlow = new Color(1.6f, 1.1f, 0.25f, 0.18f);
+    static readonly Color GoldFlash = new Color(1f, 0.88f, 0.6f);
     Color coreColor = CoreColor, glowColor = GlowColor;
     static readonly Stack<ThunderBolt3D> pool = new Stack<ThunderBolt3D>();
 
@@ -51,7 +55,7 @@ public class ThunderBolt3D : MonoBehaviour
         bolt.Begin(sky, ground, thickness, branches);
     }
 
-    // [변경] 검붉은 번개 (보스 흑뢰). 두 배색 중 하나를 무작위로 → 여러 줄기가 섞이면 검정 · 빨강이 엇갈려 보임
+    // 검붉은 번개 (보스 흑뢰). 두 배색 중 하나를 무작위로 → 여러 줄기가 섞이면 검정 · 빨강이 엇갈려 보임
     public static void StrikeDark(Vector3 sky, Vector3 ground, float thickness = 1f, int branches = 2)
     {
         ThunderBolt3D bolt = pool.Count > 0 ? pool.Pop() : Create();
@@ -61,6 +65,18 @@ public class ThunderBolt3D : MonoBehaviour
         bolt.glowColor = blackCore ? DarkGlowA : DarkGlowB;
         bolt.flash.color = DarkFlash;
         bolt.Begin(sky, ground, thickness * 1.15f, branches);
+    }
+
+    // [변경] 파랑 + 금빛 번개 (플레이어 뇌신참)
+    public static void StrikeGold(Vector3 sky, Vector3 ground, float thickness = 1f, int branches = 2)
+    {
+        ThunderBolt3D bolt = pool.Count > 0 ? pool.Pop() : Create();
+        if (bolt == null) bolt = Create();
+        bool goldCore = Random.value < 0.5f;
+        bolt.coreColor = goldCore ? GoldCore : CoreColor;
+        bolt.glowColor = goldCore ? GlowColor : GoldGlow;
+        bolt.flash.color = GoldFlash;
+        bolt.Begin(sky, ground, thickness, branches);
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

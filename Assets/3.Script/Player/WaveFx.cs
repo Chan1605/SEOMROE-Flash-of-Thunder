@@ -12,15 +12,18 @@ public class WaveFx : MonoBehaviour
     LineRenderer line;
     bool ring;
     float radius, hold, fade, t;
-    Color baseColor;
+    Color baseColor, ringColor = new Color(0.6f, 0.9f, 2.2f, 1f); // [변경] 고리 색 (뇌신참 흑뢰 배색이면 붉게)
 
-    public static void Ring(Vector3 center, float radius)
+    public static void Ring(Vector3 center, float radius) => Ring(center, radius, new Color(0.6f, 0.9f, 2.2f, 1f));
+
+    public static void Ring(Vector3 center, float radius, Color color) // [변경]
     {
         var go = new GameObject("WaveShock");
         go.transform.position = center;
         var fx = go.AddComponent<WaveFx>();
         fx.ring = true;
         fx.radius = radius;
+        fx.ringColor = color;
         fx.line = go.AddComponent<LineRenderer>();
         fx.line.sharedMaterial = Material();
         fx.line.useWorldSpace = false;
@@ -65,7 +68,7 @@ public class WaveFx : MonoBehaviour
             line.SetPosition(i, new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0f));
         }
         line.widthMultiplier = Mathf.Lerp(0.6f, 0.05f, k);
-        line.startColor = line.endColor = new Color(0.6f, 0.9f, 2.2f, 1f - k);
+        line.startColor = line.endColor = new Color(ringColor.r, ringColor.g, ringColor.b, 1f - k);
     }
 
     static Material Material()

@@ -52,7 +52,7 @@ public class PlayerThunder : MonoBehaviour
     public void AddMaxGauge(float amount)
     {
         maxGauge += amount;
-        gauge = Mathf.Min(gauge, maxGauge); // [변경] 스킬 초기화로 칸이 줄면 넘친 뇌기는 버림
+        gauge = Mathf.Min(gauge, maxGauge); // 스킬 초기화로 칸이 줄면 넘친 뇌기는 버림
         MaxGaugeChanged?.Invoke(maxGauge);
         GaugeChanged?.Invoke(gauge);
     }
@@ -82,6 +82,14 @@ public class PlayerThunder : MonoBehaviour
         if (dodge == null) dodge = GetComponent<PlayerDodge>();
         if (execution == null) execution = GetComponent<PlayerExecution>();
         gauge = Mathf.Clamp(startGauge, 0f, maxGauge);
+    }
+
+    // [변경] 씬을 넘어오면 이어받은 뇌기로. 칸 늘리는 수련 패시브(SkillTreeMenu.Start)가 먼저 적용되도록 한 프레임 뒤
+    System.Collections.IEnumerator Start()
+    {
+        if (RunState.ThunderGauge <= 0f) yield break;
+        yield return null;
+        SetGauge(Mathf.Max(gauge, RunState.ThunderGauge));
     }
 
     void OnEnable()

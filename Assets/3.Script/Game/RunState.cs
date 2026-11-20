@@ -19,6 +19,7 @@ public static class RunState
 
     public static string SpawnAt { get; set; }
     public static float UltimateGauge { get; private set; } // 궁극기 게이지 (PlayerUltimate가 Start에서 읽음)
+    public static float ThunderGauge { get; private set; }  // [변경] 뇌기 (PlayerThunder가 Start 다음 프레임에 읽음 — 수련 패시브로 칸이 늘어난 뒤)
     public static bool HasFlag(string flag) => flags.Contains(flag);
     public static void SetFlag(string flag) => flags.Add(flag);
 
@@ -36,6 +37,7 @@ public static class RunState
         hasSkills = hasStats = false;
         unlocked.Clear();
         UltimateGauge = 0f;
+        ThunderGauge = 0f; // [변경]
         flags.Clear();
     }
 
@@ -51,6 +53,8 @@ public static class RunState
 
         PlayerUltimate ultimate = Object.FindAnyObjectByType<PlayerUltimate>();
         UltimateGauge = ultimate != null ? ultimate.Gauge : 0f;
+        PlayerThunder thunder = Object.FindAnyObjectByType<PlayerThunder>();
+        ThunderGauge = thunder != null ? thunder.Gauge : 0f; // [변경] 던전 → 흑뢰 등 씬을 넘어도 뇌기 유지
 
         PlayerStats stats = Object.FindAnyObjectByType<PlayerStats>();
         hasStats = stats != null;
@@ -62,7 +66,7 @@ public static class RunState
         }
     }
 
-    // [변경] 저장 파일(SaveGame)용: 지금 상태를 JSON으로 / JSON에서 되살림
+    // 저장 파일(SaveGame)용: 지금 상태를 JSON으로 / JSON에서 되살림
     [System.Serializable]
     class Saved
     {

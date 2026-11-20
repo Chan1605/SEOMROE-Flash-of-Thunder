@@ -9,7 +9,7 @@ using UnityEngine;
 //  - 커지며 날아가다 마지막에 사라짐, 적을 벨 때 그 자리에 불꽃이 터짐
 public class EnchantWave : MonoBehaviour
 {
-    // [변경] 뇌신참 임팩트 설정 (PlayerEnchant 인스펙터에서 조절, 평소 검기는 null = 없음)
+    // 뇌신참 임팩트 설정 (PlayerEnchant 인스펙터에서 조절, 평소 검기는 null = 없음)
     [System.Serializable]
     public class Impact
     {
@@ -22,6 +22,7 @@ public class EnchantWave : MonoBehaviour
         public float scarLife = 1.4f;        // 지나간 바닥에 남는 빛 자국 (0 = 없음)
         public float enemyHitStop = 0.08f;   // 적을 벨 때 그 적들 잠깐 멈춤
         public bool endBurst = true;         // 끝에서 흐려지지 않고 번개와 함께 터지며 사라짐
+        public Palette palette = Palette.Gold; // [변경] 뇌신참 배색 (Gold = 금빛 앞날 + 푸른 몸 + 파랑 · 금빛 번개)
     }
 
     const float BaseSpeed = 26f;
@@ -34,6 +35,15 @@ public class EnchantWave : MonoBehaviour
     static readonly Color Core = new Color(2.6f, 2.9f, 3.6f, 1f);     // HDR 흰 심
     static readonly Color Body = new Color(0.45f, 0.85f, 2.2f, 0.75f);
     static readonly Color Edge = new Color(0.3f, 0.6f, 1.6f, 0f);
+    public enum Palette { Blue, Gold, Dark } // [변경] Dark = 흑뢰 배색 (보스와 겹쳐서 기본은 Gold)
+
+    // 흑뢰 배색 (Sprites/Default는 알파 합성이라 검정도 그대로 보임)
+    static readonly Color DarkCore = new Color(3.2f, 0.32f, 0.16f, 1f);  // 붉게 달아오른 심 (HDR → 블룸)
+    static readonly Color DarkBody = new Color(0.04f, 0f, 0.015f, 0.9f); // 검은 몸
+    static readonly Color DarkEdge = new Color(0.7f, 0.03f, 0.05f, 0f);  // 검붉게 사라지는 가장자리
+    // [변경] 금빛 배색: 금빛으로 달아오른 앞날 + 푸른 몸 + 금빛으로 사라지는 가장자리
+    static readonly Color GoldCore = new Color(3.4f, 2.7f, 1.1f, 1f);
+    static readonly Color GoldEdge = new Color(1.4f, 1f, 0.3f, 0f);
     static Material bladeMat, sparkMat;
     static Texture2D dot;
 
@@ -42,7 +52,10 @@ public class EnchantWave : MonoBehaviour
     float range, width, damage, posture, traveled, boltTimer;
     float scale = 1f, speed = BaseSpeed; // 크기 배율 (뇌신참은 크고 느리게)
     bool heavy;
-    Impact impact;                 // [변경]
+    Palette palette = Palette.Blue; // [변경]
+    bool dark => palette == Palette.Dark;
+    bool gold => palette == Palette.Gold;
+    Impact impact;                
     float age, nextSkyBolt;
     LineRenderer scar;
     Vector3 scarStart;
@@ -73,7 +86,8 @@ public class EnchantWave : MonoBehaviour
         wave.scale = Mathf.Max(0.1f, scale);
         wave.speed = speed > 0f ? speed : BaseSpeed / Mathf.Sqrt(wave.scale);
         wave.heavy = heavy;
-        wave.impact = impact; // [변경]
+        wave.impact = impact;
+        wave.palette = impact != null ? impact.palette : Palette.Blue; // [변경]
         wave.Build();
         if (impact != null) wave.Launch();
     }
@@ -82,7 +96,11 @@ public class EnchantWave : MonoBehaviour
     {
         EnsureMaterials();
         block = new MaterialPropertyBlock();
-        Mesh mesh = BuildMesh(width * 0.5f, BladeDepth * scale, BandHeight * scale, out frontLine);
+        Mesh mesh = dark // [변경] 배색별 메시
+            ? BuildMesh(width * 0.5f, BladeDepth * scale, BandHeight * scale, out frontLine, DarkCore, DarkBody, DarkEdge)
+            : gold
+                ? BuildMesh(width * 0.5f, BladeDepth * scale, BandHeight * scale, out frontLine, GoldCore, Body, GoldEdge)
+                : BuildMesh(width * 0.5f, BladeDepth * scale, BandHeight * scale, out frontLine, Core, Body, Edge);
         blade = AddRenderer("Blade", mesh, Vector3.zero, 1f);
         echo = AddRenderer("Echo", mesh, Vector3.back * 0.8f, 0.9f); // 뒤따르는 잔상
 
@@ -101,7 +119,9 @@ public class EnchantWave : MonoBehaviour
         ParticleSystem.ColorOverLifetimeModule col = sparks.colorOverLifetime;
         col.enabled = true;
         var g = new Gradient();
-        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.45f, 0.75f, 1f), 1f) },
+        Color sparkFrom = dark ? new Color(1f, 0.35f, 0.2f) : gold ? new Color(1f, 0.85f, 0.4f) : Color.white; // [변경] 금빛: 금빛 불똥 → 푸르게 식음
+        Color sparkTo = dark ? new Color(0.05f, 0f, 0.01f) : new Color(0.45f, 0.75f, 1f);
+        g.SetKeys(new[] { new GradientColorKey(sparkFrom, 0f), new GradientColorKey(sparkTo, 1f) },
                   new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
         col.color = g;
         var pr = sparks.GetComponent<ParticleSystemRenderer>();
@@ -115,7 +135,7 @@ public class EnchantWave : MonoBehaviour
         glow = new GameObject("Glow").AddComponent<Light>();
         glow.transform.SetParent(transform, false);
         glow.type = LightType.Point;
-        glow.color = new Color(0.55f, 0.8f, 1f);
+        glow.color = dark ? new Color(1f, 0.18f, 0.1f) : gold ? new Color(1f, 0.85f, 0.55f) : new Color(0.55f, 0.8f, 1f); // [변경]
         glow.range = 6f * scale;
         glow.intensity = 4f * Mathf.Sqrt(scale);
         glow.shadows = LightShadows.None;
@@ -141,19 +161,19 @@ public class EnchantWave : MonoBehaviour
     void Update()
     {
         age += Time.deltaTime;
-        float boost = impact != null ? 1f + (impact.launchBoost - 1f) * Mathf.Clamp01(1f - age / Mathf.Max(0.01f, impact.launchTime)) : 1f; // [변경]
+        float boost = impact != null ? 1f + (impact.launchBoost - 1f) * Mathf.Clamp01(1f - age / Mathf.Max(0.01f, impact.launchTime)) : 1f;
         float step = speed * boost * Time.deltaTime;
         traveled += step;
         transform.position += direction * step;
         float k = Mathf.Clamp01(traveled / range);
-        float pop = impact != null ? Mathf.Lerp(impact.launchPop, 1f, Mathf.Clamp01(age / 0.12f)) : 1f; // [변경]
+        float pop = impact != null ? Mathf.Lerp(impact.launchPop, 1f, Mathf.Clamp01(age / 0.12f)) : 1f;
         transform.localScale = Vector3.one * Mathf.Lerp(0.85f, 1.3f, k) * pop; // 날아가며 커짐
-        if (impact != null) UpdateImpact(); // [변경]
+        if (impact != null) UpdateImpact();
 
         HitAlongPath(step);
 
         // 처음 순간 켜지고 · 후반 45%에서 사라짐
-        float fadeFrom = impact != null && impact.endBurst ? 0.85f : 0.55f; // [변경] 뇌신참은 끝까지 진하게 → 터지며 사라짐
+        float fadeFrom = impact != null && impact.endBurst ? 0.85f : 0.55f; // 뇌신참은 끝까지 진하게 → 터지며 사라짐
         float alpha = Mathf.Clamp01(k / 0.08f) * (1f - Mathf.Clamp01((k - fadeFrom) / (1f - fadeFrom)));
         SetAlpha(alpha);
         glow.intensity = 4f * Mathf.Sqrt(scale) * alpha;
@@ -165,17 +185,17 @@ public class EnchantWave : MonoBehaviour
             boltTimer = BoltInterval / scale;
             int a = Random.Range(2, frontLine.Length / 2);
             int b = Mathf.Min(frontLine.Length - 3, a + Random.Range(4, 9));
-            ThunderBolt3D.Strike(transform.TransformPoint(frontLine[a]), transform.TransformPoint(frontLine[b]), 0.18f * scale, 0);
+            Bolt(transform.TransformPoint(frontLine[a]), transform.TransformPoint(frontLine[b]), 0.18f * scale, 0);
         }
 
         if (traveled >= range)
         {
-            if (impact != null && impact.endBurst) EndBurst(); // [변경]
+            if (impact != null && impact.endBurst) EndBurst();
             Finish();
         }
     }
 
-    // ===== [변경] 뇌신참 임팩트 =====
+    // ===== 뇌신참 임팩트 =====
     // 발사 자리: 섬광 불꽃 · 바닥 충격파 고리 · 앞쪽에 굵은 낙뢰 두 줄기
     void Launch()
     {
@@ -188,12 +208,12 @@ public class EnchantWave : MonoBehaviour
             sparks.Emit(p, 1);
         }
         Vector3 ground = new Vector3(transform.position.x, groundY, transform.position.z);
-        if (impact.shockRadius > 0f) WaveFx.Ring(ground + Vector3.up * 0.05f, impact.shockRadius);
+        if (impact.shockRadius > 0f) WaveFx.Ring(ground + Vector3.up * 0.05f, impact.shockRadius, RingColor);
         Vector3 side = Vector3.Cross(Vector3.up, direction).normalized;
         for (int s = -1; s <= 1; s += 2)
         {
             Vector3 hit = ground + direction * 2f + side * s * width * 0.2f;
-            ThunderBolt3D.Strike(hit + Vector3.up * 14f, hit, impact.skyBoltThickness * 1.3f, 2);
+            Bolt(hit + Vector3.up * 14f, hit, impact.skyBoltThickness * 1.3f, 2);
         }
         nextSkyBolt = impact.skyBoltSpacing;
         if (impact.scarLife > 0f) scar = Scar(ground);
@@ -208,7 +228,7 @@ public class EnchantWave : MonoBehaviour
             nextSkyBolt += impact.skyBoltSpacing;
             Vector3 side = Vector3.Cross(Vector3.up, direction).normalized * Random.Range(-0.3f, 0.3f) * width;
             Vector3 hit = new Vector3(transform.position.x, groundY, transform.position.z) + side;
-            ThunderBolt3D.Strike(hit + Vector3.up * 14f + Random.insideUnitSphere * 2f, hit, impact.skyBoltThickness, 1);
+            Bolt(hit + Vector3.up * 14f + Random.insideUnitSphere * 2f, hit, impact.skyBoltThickness, 1);
         }
         if (scar != null) scar.SetPosition(1, new Vector3(transform.position.x, groundY + 0.04f, transform.position.z));
     }
@@ -225,8 +245,8 @@ public class EnchantWave : MonoBehaviour
             sparks.Emit(p, 1);
         }
         Vector3 ground = new Vector3(center.x, groundY, center.z);
-        ThunderBolt3D.Strike(ground + Vector3.up * 16f, ground, impact.skyBoltThickness * 1.5f, 3);
-        if (impact.shockRadius > 0f) WaveFx.Ring(ground + Vector3.up * 0.05f, impact.shockRadius * 0.7f);
+        Bolt(ground + Vector3.up * 16f, ground, impact.skyBoltThickness * 1.5f, 3);
+        if (impact.shockRadius > 0f) WaveFx.Ring(ground + Vector3.up * 0.05f, impact.shockRadius * 0.7f, RingColor);
     }
 
     LineRenderer Scar(Vector3 start)
@@ -239,7 +259,7 @@ public class EnchantWave : MonoBehaviour
         line.SetPosition(0, start + Vector3.up * 0.04f);
         line.SetPosition(1, start + Vector3.up * 0.04f);
         line.widthMultiplier = 0.35f * scale;
-        line.startColor = line.endColor = new Color(0.5f, 0.85f, 2f, 0.9f);
+        line.startColor = line.endColor = dark ? new Color(2f, 0.15f, 0.08f, 0.9f) : gold ? new Color(1.8f, 1.35f, 0.45f, 0.9f) : new Color(0.5f, 0.85f, 2f, 0.9f); // [변경]
         line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         WaveFx.FadeOut(line, 1f, impact.scarLife); // 날아가는 동안(약 1초) 유지 후 흐려짐
         return line;
@@ -280,7 +300,7 @@ public class EnchantWave : MonoBehaviour
                 Direction = direction
             });
             Burst(point);
-            if (impact != null && impact.enemyHitStop > 0f) CombatTime.SlowEnemies(0.02f, impact.enemyHitStop, 0.05f); // [변경] 벨 때 묵직하게
+            if (impact != null && impact.enemyHitStop > 0f) CombatTime.SlowEnemies(0.02f, impact.enemyHitStop, 0.05f); // 벨 때 묵직하게
         }
     }
 
@@ -309,8 +329,18 @@ public class EnchantWave : MonoBehaviour
             p.velocity = Random.onUnitSphere * Random.Range(3f, 8f) + direction * 2f;
             sparks.Emit(p, 1);
         }
-        ThunderBolt3D.Strike(point + Vector3.up * 1.4f + Random.insideUnitSphere * 0.4f, point, 0.3f, 1);
+        Bolt(point + Vector3.up * 1.4f + Random.insideUnitSphere * 0.4f, point, 0.3f, 1);
     }
+
+    // 흑뢰 배색이면 검붉은 번개
+    void Bolt(Vector3 from, Vector3 to, float thickness, int branches)
+    {
+        if (dark) ThunderBolt3D.StrikeDark(from, to, thickness, branches);
+        else if (gold) ThunderBolt3D.StrikeGold(from, to, thickness, branches); // [변경]
+        else ThunderBolt3D.Strike(from, to, thickness, branches);
+    }
+
+    Color RingColor => dark ? new Color(2.2f, 0.18f, 0.1f, 1f) : gold ? new Color(2.2f, 1.7f, 0.6f, 1f) : new Color(0.6f, 0.9f, 2.2f, 1f); // [변경]
 
     void SetAlpha(float a)
     {
@@ -331,7 +361,8 @@ public class EnchantWave : MonoBehaviour
 
     // ===== 메시: 가로 초승달 + 세로 띠 (정점 색으로 심 · 몸 · 가장자리 그라데이션) =====
     // 원점(로컬)이 앞날 가운데, +Z가 날아가는 쪽. 날 끝으로 갈수록 두께 · 높이 · 밝기가 줄어듦
-    static Mesh BuildMesh(float halfWidth, float bladeDepth, float bandHeight, out Vector3[] front)
+    // 배색(core · body · edge)을 받아 평소 푸른 검기 / 흑뢰 검기를 같은 메시로
+    static Mesh BuildMesh(float halfWidth, float bladeDepth, float bandHeight, out Vector3[] front, Color core, Color body, Color edge)
     {
         var verts = new List<Vector3>();
         var colors = new List<Color>();
@@ -344,7 +375,7 @@ public class EnchantWave : MonoBehaviour
 
         // 가로 날: 뒤(0) → 몸 → 심 → 앞 가장자리(0) 네 줄
         float[] depth = { 1f, 0.55f, 0.12f, -0.06f };
-        Color[] shade = { Edge, Body, Core, new Color(Core.r, Core.g, Core.b, 0f) };
+        Color[] shade = { edge, body, core, new Color(core.r, core.g, core.b, 0f) };
         int rows = depth.Length;
         for (int s = 0; s <= Segments; s++)
         {
@@ -365,7 +396,7 @@ public class EnchantWave : MonoBehaviour
         // 세로 띠: 심 위치를 따라 아래(0) → 몸 → 심 → 몸 → 위(0) 다섯 줄
         int baseIndex = verts.Count;
         float[] height = { -1f, -0.3f, 0f, 0.3f, 1f };
-        Color[] bandShade = { Edge, Body, Core, Body, Edge };
+        Color[] bandShade = { edge, body, core, body, edge };
         for (int s = 0; s <= Segments; s++)
         {
             float t = s / (float)Segments * 2f - 1f;

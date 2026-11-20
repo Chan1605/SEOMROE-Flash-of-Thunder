@@ -158,7 +158,7 @@ public class GameHUD : MonoBehaviour
         ZoneArena.AnyCleared += OnZoneCleared;
         if (health != null) health.Damaged += OnDamaged;
         if (thunderSource != null) thunderSource.GaugeChanged += OnGaugeChanged;
-        if (thunderSource != null) thunderSource.MaxGaugeChanged += OnMaxGaugeChanged; // [변경]
+        if (thunderSource != null) thunderSource.MaxGaugeChanged += OnMaxGaugeChanged;
         if (kanpaSource != null)
         {
             kanpaSource.FollowReady += ShowFollowPrompt;
@@ -173,7 +173,7 @@ public class GameHUD : MonoBehaviour
         ZoneArena.AnyCleared -= OnZoneCleared;
         if (health != null) health.Damaged -= OnDamaged;
         if (thunderSource != null) thunderSource.GaugeChanged -= OnGaugeChanged;
-        if (thunderSource != null) thunderSource.MaxGaugeChanged -= OnMaxGaugeChanged; // [변경]
+        if (thunderSource != null) thunderSource.MaxGaugeChanged -= OnMaxGaugeChanged;
         if (kanpaSource != null)
         {
             kanpaSource.FollowReady -= ShowFollowPrompt;
@@ -316,7 +316,7 @@ public class GameHUD : MonoBehaviour
     }
 
     // ===== 뇌기 =====
-    // [변경] 뇌기 칸 수가 늘면(수련 · 뇌기 확장) 마지막 칸을 복제해 붙이고, 전체 폭은 체력바와 같게 다시 나눔
+    // 뇌기 칸 수가 늘면(수련 · 뇌기 확장) 마지막 칸을 복제해 붙이고, 전체 폭은 체력바와 같게 다시 나눔
     void OnMaxGaugeChanged(float max)
     {
         if (thunderFills == null || thunderFills.Length == 0 || thunderFills[0] == null) return;
@@ -590,6 +590,15 @@ public class GameHUD : MonoBehaviour
             SetFill(chargeFill, chargeSource.ChargeRatio);
             var image = chargeFill.GetComponent<Image>();
             if (image != null) image.color = color;
+        }
+
+        if (chargeSource.GatherMode) // [변경] 뇌기 집중: 게이지 = 차오르는 뇌기 한 칸, 문구 = 집중 · 가득 · 상대 없음
+        {
+            string status = chargeSource.GatherStatus;
+            if (chargeLabel != null && chargeLabel.text != status) chargeLabel.text = status;
+            if (level != chargeLevel && level > 1) UITween.Punch(gauge, 0.08f, 0.2f);
+            chargeLevel = level;
+            return;
         }
 
         if (level != chargeLevel)

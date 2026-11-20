@@ -50655,6 +50655,7 @@ MonoBehaviour:
   color: {r: 1, g: 0.45, b: 0.25, a: 0.95}
   size: 16
   height: 1.25
+  frameColor: {r: 0.95, g: 0.8, b: 0.45, a: 0.9}
 --- !u!1001 &2037278711
 PrefabInstance:
   m_ObjectHideFlags: 0

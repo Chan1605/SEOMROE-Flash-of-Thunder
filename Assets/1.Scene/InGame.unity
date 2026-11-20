@@ -60247,6 +60247,9 @@ MonoBehaviour:
   spawnAt: 
   setFlag: 
   skipIfFlag: DungeonCleared
+  showPortal: 1
+  portalHeight: 1.7
+  portalRadius: 1.4
 --- !u!4 &496697936
 Transform:
   m_ObjectHideFlags: 0
@@ -201699,10 +201702,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
-    - target: {fileID: 1391606783692858250, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 2271414872424868255, guid: 028fc801622cbcf43ac5ff5a768f8486, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -250634,6 +250633,7 @@ MonoBehaviour:
   color: {r: 1, g: 0.45, b: 0.25, a: 0.95}
   size: 16
   height: 1.25
+  frameColor: {r: 0.95, g: 0.8, b: 0.45, a: 0.9}
 --- !u!1001 &2031098981
 PrefabInstance:
   m_ObjectHideFlags: 0

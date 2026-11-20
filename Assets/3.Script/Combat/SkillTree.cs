@@ -10,7 +10,7 @@ public enum SkillId
     StanceMarks,   // 발도 표식 3 → 6
     EnchantDraw,   // 각성 중 Q 발도
     Launcher,      // 삭제됨 (공중 콤보). 뒤 번호가 바뀌지 않게 자리만 남김 — 스킬트리에선 숨김
-    ChargeLevel3,  // 차지 강타 3단계 (풀차지 섬격)
+    ChargeLevel3,  // [변경] 뇌기 집중 강화 (우클릭 홀드 충전 1.5배). 예전 이름 그대로 두어 저장된 해금 번호 유지
     KanpaSmash,    // 간파 뒤 뇌락
     DodgeDraw,     // 저스트 회피 뒤 무료 발도
     // 수련(패시브)
@@ -77,7 +77,7 @@ public static class SkillTree
         return true;
     }
 
-    // [변경] 스킬 초기화: 해금을 모두 지우고 돌려줄 포인트를 더함 (돌려줄 양은 비용을 아는 SkillTreeMenu가 계산)
+    // 스킬 초기화: 해금을 모두 지우고 돌려줄 포인트를 더함 (돌려줄 양은 비용을 아는 SkillTreeMenu가 계산)
     public static void Respec(int refund)
     {
         unlocked.Clear();

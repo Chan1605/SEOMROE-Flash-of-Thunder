@@ -62,9 +62,8 @@ MonoBehaviour:
     requires: 03000000
     preview: {fileID: 32900000, guid: 2b592042bbc52b04f87c5b743a415a3f, type: 3}
   - id: 6
-    displayName: "\uCC28\uC9C0 \uAC15\uD0C0"
-    description: "\uC6B0\uD074\uB9AD \uD480\uCC28\uC9C0 \uC2DC  \uBA40\uB9AC \uB3CC\uC9C4\uD574
-      \uBCA0\uB294 \uC12C\uACA9\uC774 \uB098\uAC04\uB2E4."
+    displayName: "\uB1CC\uAE30 \uC9D1\uC911"
+    description: "\uC6B0\uD074\uB9AD\uC744 \uB204\uB974\uACE0 \uBC84\uD2F0\uB294 \uB3D9\uC548 \uBAA8\uC774\uB294 \uB1CC\uAE30\uAC00 1.5\uBC30 \uBE68\uB77C\uC9C4\uB2E4. (\uC804\uD22C \uC911\uC5D0\uB9CC, \uB9DE\uC73C\uBA74 \uB04A\uAE40)"
     cost: 1
     tab: 0
     branch: 1

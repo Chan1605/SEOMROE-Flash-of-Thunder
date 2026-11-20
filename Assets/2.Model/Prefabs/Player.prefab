@@ -1411,8 +1411,13 @@ MonoBehaviour:
   - 1.4
   - 2
   - 3
-  turnSpeed: 360
+  turnSpeed: 0
   logCharge: 0
+  gatherMode: 1
+  thunder: {fileID: 0}
+  gatherRate: 0.5
+  gatherBoost: 1.5
+  gatherRange: 15
   dashFromLevel: 3
   dashDistances:
   - 4.5
@@ -1727,7 +1732,7 @@ MonoBehaviour:
   chainPosture: 4
   finisherMinTime: 1
   finisherWindup: 0.75
-  finisherEnemySlow: 0.05
+  finisherEnemySlow: 1
   finisherDamage: 100
   finisherDamagePerHit: 4
   finisherMaxBonus: 80
@@ -1736,8 +1741,8 @@ MonoBehaviour:
   finisherMaxPostureBonus: 60
   finisherRange: 20
   finisherWidth: 20
-  finisherScale: 2.2
-  finisherSpeed: 17.5
+  finisherScale: 1.7
+  finisherSpeed: 25
   releaseFreeze: 0.07
   releasePunch: 0.14
   releaseShake: 0.6
@@ -1751,6 +1756,7 @@ MonoBehaviour:
     scarLife: 0
     enemyHitStop: 0.08
     endBurst: 1
+    palette: 0
   dischargeDamage: 20
   dischargePostureDamage: 20
   dischargeRadius: 3
@@ -1954,6 +1960,7 @@ MonoBehaviour:
   - hakama
   hemTop: 0.12
   hemFree: 0.2
+  hemActive: 0
   flutterMeshes:
   - fabric
   - belt1

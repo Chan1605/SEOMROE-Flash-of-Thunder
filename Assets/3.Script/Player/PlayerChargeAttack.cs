@@ -7,8 +7,9 @@ using UnityEngine.InputSystem;
 //  콤보 중 누르면      → △를 바로 예약, △ 초반에 적 공격이 닿으면 간파 (PlayerKanpa)
 //  짧게 눌렀다 떼면       → 강공격 △ (콤보 분기: □□△, □□□△ …)
 //  길게 누르고 있으면     → 차지 자세, 단계(1~3)가 오름
-//  dashFromLevel 단계 이상에서 떼면 섬격(閃擊): 벽력일섬처럼 앞으로 빠르게 지나가며 길 위의 적을 베고, 한 박자 뒤 일괄 피해
-//  그 전에 떼면 아무것도 안 나가고 취소 (차지 강타는 없앰)
+//  [변경] gatherMode(기본): 차지 자세 = 뇌기 집중. 전투 중(구역 전투 · 가까운 적)에만 초당 gatherRate칸씩 뇌기가 참
+//         피격 · 회피 · 스킬로 끊기고, 떼면 그냥 자세를 풂 (섬격 없음). '뇌기 집중' 해금 시 gatherBoost배
+//  gatherMode를 끄면 예전: dashFromLevel 단계 이상에서 떼면 섬격(閃擊), 그 전에 떼면 취소
 public class PlayerChargeAttack : MonoBehaviour
 {
     static readonly int LocomotionHash = Animator.StringToHash("Locomotion");
@@ -44,6 +45,13 @@ public class PlayerChargeAttack : MonoBehaviour
     [SerializeField] float turnSpeed = 360f;
     [SerializeField] bool logCharge = true;
 
+    [Header("Gather (뇌기 집중)")] // [변경]
+    [SerializeField] bool gatherMode = true;
+    [SerializeField] PlayerThunder thunder;
+    [SerializeField] float gatherRate = 0.5f;   // 초당 뇌기 칸
+    [SerializeField] float gatherBoost = 1.5f;  // 스킬 '뇌기 집중'(ChargeLevel3) 해금 시 배율
+    [SerializeField] float gatherRange = 15f;   // 이 거리 안에 싸울 적이 있어야 모임 (구역 전투 중이면 항상)
+
     // 섬격: 단계별 거리. 피해 = releaseAttack 피해 × 단계 배율. 2단계부터 방패 붕괴, 풀차지는 아머도 무시 + 낙뢰 연출
     [Header("Dash (섬격)")]
     [SerializeField] int dashFromLevel = 3;            // 1이면 모든 차지가 섬격, 3이면 풀차지만 (그 전에 떼면 취소)
@@ -74,6 +82,9 @@ public class PlayerChargeAttack : MonoBehaviour
     bool dashSheathing; // 돌진하면서 바로 납도 모션을 틀었는지
     float hitStopUntil = -1f;
     float savedTimeScale = 1f;
+    bool hitWhileCharging; // [변경] 경직 없는 피격도 집중을 끊음
+    float combatCheckAt;
+    bool inCombat;
     CharacterController controller;
     readonly Collider[] pathBuffer = new Collider[64];
     readonly RaycastHit[] castBuffer = new RaycastHit[16];
@@ -85,7 +96,12 @@ public class PlayerChargeAttack : MonoBehaviour
     public int Level => level;
     public int MaxLevel => levelTimes.Length;
     // HUD용 0~1 (마지막 단계 도달 시 1)
-    public float ChargeRatio => charging ? Mathf.Clamp01(chargeTime / Mathf.Max(0.01f, levelTimes[levelTimes.Length - 1])) : 0f;
+    public float ChargeRatio => !charging ? 0f : gatherMode ? GatherRatio : Mathf.Clamp01(chargeTime / Mathf.Max(0.01f, levelTimes[levelTimes.Length - 1]));
+    // [변경] 뇌기 집중: HUD 게이지 = 지금 차고 있는 뇌기 한 칸의 진행도, 문구 = 상태
+    public bool GatherMode => gatherMode;
+    public bool Gathering => charging && gatherMode && inCombat && thunder != null && thunder.Gauge < thunder.MaxGauge - 0.001f;
+    public string GatherStatus => thunder != null && thunder.Gauge >= thunder.MaxGauge - 0.001f ? "뇌기 MAX" : inCombat ? "뇌기 집중" : "상대 없음";
+    float GatherRatio => thunder == null ? 0f : thunder.Gauge >= thunder.MaxGauge - 0.001f ? 1f : thunder.Gauge - Mathf.Floor(thunder.Gauge);
 
     public event Action ChargeStarted;
     public event Action<int> ChargeLevelChanged;
@@ -108,6 +124,7 @@ public class PlayerChargeAttack : MonoBehaviour
         if (stats == null) stats = GetComponent<PlayerStats>();
         if (afterimage == null) afterimage = GetComponent<PlayerAfterimage>();
         if (stance == null) stance = GetComponent<PlayerStance>();
+        if (thunder == null) thunder = GetComponent<PlayerThunder>(); // [변경]
         if (dashTrail == null && skill != null) dashTrail = skill.DashTrail;
         controller = GetComponent<CharacterController>();
     }
@@ -118,6 +135,7 @@ public class PlayerChargeAttack : MonoBehaviour
         heavyAction.action.Enable();
         heavyAction.action.performed += OnPressed;
         heavyAction.action.canceled += OnReleased;
+        if (health != null) health.Damaged += OnDamaged; // [변경]
     }
 
     void OnDisable()
@@ -127,6 +145,7 @@ public class PlayerChargeAttack : MonoBehaviour
             heavyAction.action.performed -= OnPressed;
             heavyAction.action.canceled -= OnReleased;
         }
+        if (health != null) health.Damaged -= OnDamaged; // [변경]
         if (charging) EndCharge(true);
         if (IsDashing) EndDash(true);
         pressed = false;
@@ -196,15 +215,50 @@ public class PlayerChargeAttack : MonoBehaviour
             consumed = true; // 손을 떼도 강공격이 나가지 않게
             return;
         }
+        if (hitWhileCharging) // [변경] 경직 없이 맞아도 집중이 깨짐 (경직이면 위에서 처리)
+        {
+            EndCharge(true);
+            consumed = true;
+            return;
+        }
 
         chargeTime += dt;
         int next = 1;
-        int levels = SkillTree.IsUnlocked(SkillId.ChargeLevel3) ? levelTimes.Length : Mathf.Min(2, levelTimes.Length); // [변경] 3단계는 해금 후
+        int levels = gatherMode || SkillTree.IsUnlocked(SkillId.ChargeLevel3) ? levelTimes.Length : Mathf.Min(2, levelTimes.Length); // 3단계는 해금 후 (집중은 연출 단계라 항상)
         for (int i = 1; i < levels; i++)
             if (chargeTime >= levelTimes[i]) next = i + 1;
         if (next != level) SetLevel(next);
 
         FaceInput(dt);
+        if (gatherMode) Gather(dt); // [변경]
+    }
+
+    // ===== [변경] 뇌기 집중 =====
+    // 핵심: 전투 중에만 차오름 → 전투 전에 미리 채워 두는 플레이 방지. 0.25초마다 주변 적을 확인
+    void Gather(float dt)
+    {
+        if (Time.time >= combatCheckAt)
+        {
+            combatCheckAt = Time.time + 0.25f;
+            inCombat = InCombat();
+        }
+        if (!inCombat || thunder == null) return;
+        float rate = gatherRate * (SkillTree.IsUnlocked(SkillId.ChargeLevel3) ? gatherBoost : 1f);
+        thunder.Add(rate * dt);
+    }
+
+    bool InCombat()
+    {
+        if (ZoneArena.Fighting != null) return true;
+        float range2 = gatherRange * gatherRange;
+        foreach (EnemySwordsman e in EnemySwordsman.Alive)
+            if (e != null && e.CanBeTargeted && (e.transform.position - transform.position).sqrMagnitude <= range2) return true;
+        return false;
+    }
+
+    void OnDamaged(DamageInfo info)
+    {
+        if (charging) hitWhileCharging = true;
     }
 
     bool CanCharge()
@@ -241,6 +295,8 @@ public class PlayerChargeAttack : MonoBehaviour
         charging = true;
         chargeTime = 0f;
         level = 0;
+        hitWhileCharging = false; // [변경]
+        combatCheckAt = 0f;
         animator.CrossFadeInFixedTime(ChargeStartHash, 0.1f, 0, 0f);
         ChargeStarted?.Invoke();
         SetLevel(1);
@@ -257,6 +313,11 @@ public class PlayerChargeAttack : MonoBehaviour
     // 차지 강타 삭제: dashFromLevel 전에 떼면 취소, 이후면 섬격
     void Release()
     {
+        if (gatherMode) // [변경] 집중은 떼면 자세만 풂
+        {
+            EndCharge(true);
+            return;
+        }
         int releasedLevel = level;
         if (releasedLevel < dashFromLevel)
         {

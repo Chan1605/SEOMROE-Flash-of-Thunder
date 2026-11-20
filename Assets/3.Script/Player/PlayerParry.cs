@@ -82,7 +82,7 @@ public class PlayerParry : MonoBehaviour
         if (skill != null && skill.IsActive) return false;
         if (dodge != null && dodge.IsDodging && !dodge.CanCancel) return false; // 회피 후반이면 간파로 끊고 들어감
         if (health != null && health.IsStunned) return false;
-        if (thunder != null && !thunder.CanParry) return false; // [변경] 각성 중엔 칸 없이 패링 // 뇌기가 없으면 간파 대신 강공격
+        if (thunder != null && !thunder.CanParry) return false; // 각성 중엔 칸 없이 패링 // 뇌기가 없으면 간파 대신 강공격
 
         IAttackThreat found = FindThreat();
         if (found == null) return false;
@@ -90,14 +90,14 @@ public class PlayerParry : MonoBehaviour
         // v2는 경직을 부딪히는 순간으로 미룸
         if (clashStyle)
         {
-            if (thunder != null) thunder.SpendParry(); // [변경]
+            if (thunder != null) thunder.SpendParry();
             BeginClash(found);
             return true;
         }
 
         HitResult result = found.ReceiveParry(gameObject);
         if (result != HitResult.Countered) return false;
-        if (thunder != null) thunder.SpendParry(); // [변경]
+        if (thunder != null) thunder.SpendParry();
 
         Begin(found);
         return true;
@@ -124,6 +124,18 @@ public class PlayerParry : MonoBehaviour
             {
                 bestDist = dist;
                 best = threat;
+            }
+        }
+
+        // [변경] 보스 검기도 패링 대상 (콜라이더가 없어 목록에서 찾음)
+        foreach (BossSwordWave wave in BossSwordWave.Active)
+        {
+            if (wave == null || !wave.IsParryable || !wave.IsAboutToHit(transform.position, window, lateWindow)) continue;
+            float dist = (wave.transform.position - transform.position).sqrMagnitude;
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = wave;
             }
         }
 

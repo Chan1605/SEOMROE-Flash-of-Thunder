@@ -80,12 +80,12 @@ MonoBehaviour:
   postureBreakStun: 2.25
   parryPosture: 24
   postureTakenScale: 0.5
-  executionDamageRatio: 0.25
+  executionDamageRatio: 0.15
   bossLevelScaling: 0.8
   normalDamageScale: 0.35
   brokenDamageScale: 1.5
   instantKillDamageRatio: 0.12
-  phase2Ratio: 0.5
+  phase2Ratio: 1
   reviveFallTime: 1.6
   reviveFillTime: 1.6
   introPortal: 1

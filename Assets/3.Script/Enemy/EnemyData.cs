@@ -27,7 +27,7 @@ public class EnemyData : ScriptableObject
     [SerializeField] bool resistInstantKill; // 섬뢰일도 즉사 대신 최대 체력 × instantKillDamageRatio 피해 (궁극기 · 처형은 그대로 즉사)
     [SerializeField] bool useDelaySlash; // 보스처럼 지연 베기 (delayChance · delayTime 사용)
     [SerializeField] bool parryTell;            // 패링할 수 있는 공격이 닿기 직전 칼날이 파랗게 번쩍 (보스 · 정예)
-    [SerializeField] float parryTellLead = 0.6f; // [변경] 판정 시작 몇 초(실제 시간) 전에 번쩍일지 — 모션보다 먼저 보이는 예고 (예고가 이보다 짧으면 예고 시작 순간)
+    [SerializeField] float parryTellLead = 0.6f; // 판정 시작 몇 초(실제 시간) 전에 번쩍일지 — 모션보다 먼저 보이는 예고 (예고가 이보다 짧으면 예고 시작 순간)
     [SerializeField] bool armorDuringSwing = true;
     // true면 칼을 휘두르기 시작한 순간부터 연타가 끝날 때까지 아머 → □로는 못 끊고 △ 간파로 맞받아야 함. 예고(Windup) 중에는 경직됨
     [SerializeField] bool armorWholeSwing = true;
@@ -106,7 +106,7 @@ public class EnemyData : ScriptableObject
     [SerializeField, Range(0.05f, 1f)] float normalDamageScale = 0.35f; // 평소(체간 붕괴 전) 받는 피해 배율 → 체간을 무너뜨려야 크게 깎임
     [SerializeField] float brokenDamageScale = 1.5f;                    // 체간 붕괴 중 받는 피해 배율 (처형 피해는 별도)
     [SerializeField, Range(0.01f, 1f)] float instantKillDamageRatio = 0.12f; // 일섬 즉사(뇌인 가득)는 보스에게 이 비율 피해
-    [SerializeField, Range(0.1f, 0.9f)] float phase2Ratio = 0.5f; // 2페이즈 부활 때 회복하는 체력 비율
+    [SerializeField, Range(0.1f, 1f)] float phase2Ratio = 1f; // 2페이즈 부활 때 회복하는 체력 비율 (1 = 가득)
     [SerializeField] float reviveFallTime = 1.6f;   // 쓰러져 있는 시간
     [SerializeField] float reviveFillTime = 1.6f;   // 일어나며 체력이 차오르는 시간
     [SerializeField] bool introPortal = true;       // 첫 등장: 레터박스 + 포탈에서 걸어 나옴
@@ -163,6 +163,10 @@ public class EnemyData : ScriptableObject
     [SerializeField] float waveWidth = 2.2f;
     [SerializeField] float waveDamage = 16f;
     [SerializeField] float waveCooldown = 6f;
+    [SerializeField] bool waveParryable = true;       // [변경] 닿기 직전 패링으로 막음 (땅 검기 제외)
+    [SerializeField] bool waveReflect = true;         // 패링하면 보스에게 되받아침 (끄면 사라지기만)
+    [SerializeField] float waveReflectDamage = 30f;
+    [SerializeField] float waveReflectPosture = 35f;
     [SerializeField] bool wavePhase1 = true;              // 1페이즈에도 검기 (쿨타임 × wavePhase1CooldownScale)
     [SerializeField] float wavePhase1CooldownScale = 1.5f;
     [SerializeField] float phase2WaveSpread = 20f;        // 2페이즈 검기를 이 각도로 세 갈래 (0이면 한 줄기)
@@ -342,6 +346,10 @@ public class EnemyData : ScriptableObject
     public float WaveWidth => waveWidth;
     public float WaveDamage => waveDamage;
     public float WaveCooldown => waveCooldown;
+    public bool WaveParryable => waveParryable; // [변경]
+    public bool WaveReflect => waveReflect;
+    public float WaveReflectDamage => waveReflectDamage;
+    public float WaveReflectPosture => waveReflectPosture;
     public bool WavePhase1 => wavePhase1;
     public float WavePhase1CooldownScale => wavePhase1CooldownScale;
     public float Phase2WaveSpread => phase2WaveSpread;

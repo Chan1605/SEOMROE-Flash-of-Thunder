@@ -154,7 +154,7 @@ public partial class EnemySwordsman
             bossCamera = FindAnyObjectByType<ThirdPersonCamera>();
             moveSpeed = 0f;
             bool retry = !introSeen.Add(data); // 재도전이면 칼 뽑는 등장을 건너뛰고 바로 싸움
-            if (retry && awaitingIntro) // [변경] 숨겨 둔 보스가 등장 연출 없이 싸우게 되면 바로 보이게
+            if (retry && awaitingIntro) // 숨겨 둔 보스가 등장 연출 없이 싸우게 되면 바로 보이게
             {
                 awaitingIntro = false;
                 SetBodyVisible(true);
@@ -581,7 +581,8 @@ public partial class EnemySwordsman
                 Attacker = gameObject,
                 Damage = data.WaveDamage * DamageMul,
                 Weight = AttackWeight.Heavy
-            }, waveVisual, waveHitVfx, telegraphMaterial);
+            }, waveVisual, waveHitVfx, telegraphMaterial)
+                .Parry(data.WaveParryable, data.WaveReflect, data.WaveReflectDamage, data.WaveReflectPosture); // [변경] 검기 패링 · 되받아치기
         }
     }
 
