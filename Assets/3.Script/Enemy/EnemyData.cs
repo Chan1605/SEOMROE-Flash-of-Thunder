@@ -26,6 +26,8 @@ public class EnemyData : ScriptableObject
     [SerializeField] float attackPower = 1f; // 공격 피해 배율 (AttackData 피해 × 이 값)
     [SerializeField] bool resistInstantKill; // 섬뢰일도 즉사 대신 최대 체력 × instantKillDamageRatio 피해 (궁극기 · 처형은 그대로 즉사)
     [SerializeField] bool useDelaySlash; // 보스처럼 지연 베기 (delayChance · delayTime 사용)
+    [SerializeField] bool parryTell;            // 패링할 수 있는 공격이 닿기 직전 칼날이 파랗게 번쩍 (보스 · 정예)
+    [SerializeField] float parryTellLead = 0.6f; // [변경] 판정 시작 몇 초(실제 시간) 전에 번쩍일지 — 모션보다 먼저 보이는 예고 (예고가 이보다 짧으면 예고 시작 순간)
     [SerializeField] bool armorDuringSwing = true;
     // true면 칼을 휘두르기 시작한 순간부터 연타가 끝날 때까지 아머 → □로는 못 끊고 △ 간파로 맞받아야 함. 예고(Windup) 중에는 경직됨
     [SerializeField] bool armorWholeSwing = true;
@@ -41,9 +43,9 @@ public class EnemyData : ScriptableObject
     [Header("Death")]
     [SerializeField] float respawnTime = 3f;
     [SerializeField] int xpReward = 10; // 구역 적을 처치하면 플레이어가 받는 경험치
-    [SerializeField] float deathPush = 1.3f; // [변경] 쓰러질 때 맞은 방향으로 미끄러지는 거리
+    [SerializeField] float deathPush = 1.3f; // 쓰러질 때 맞은 방향으로 미끄러지는 거리
 
-    // [변경] 일반 적 행동 (EnemySwordsman.Tactics.cs). 보스 · 수련 상대는 쓰지 않음
+    // 일반 적 행동 (EnemySwordsman.Tactics.cs). 보스 · 수련 상대는 쓰지 않음
     //  회피: 나를 향한 공격이 시작되면 뒤/옆으로 빠짐 → 확률로 곧바로 반격
     //  달려들기: 거리가 벌어지면 달려와 짧은 예고로 베기 / 끼어들기: 플레이어가 다른 적을 칠 때 옆에서 짧은 예고로 베기
     [Header("Tactics")]
@@ -90,7 +92,7 @@ public class EnemyData : ScriptableObject
     [SerializeField] float exhaustTime = 1.4f;
 
     // 보스: 경직 없이 버티다 체간(자세)이 가득 차면 붕괴 → 처형(즉사 대신 최대 체력 비율 피해)
-    // 체력 phase2Ratio 이하에서 포효 → 2페이즈(빨라짐 + 검기). 패턴: 연속 베기 · 잡기 · 도약 내려찍기 · 검기
+    // 1페이즈 체력을 다 깎으면 쓰러졌다 일어나며 체력이 phase2Ratio까지 차오름 → 포효 → 2페이즈(빨라짐 + 새 패턴)
     [Header("Boss")]
     [SerializeField] string displayName = "흑뢰";
     [SerializeField] float maxPosture = 100f;
@@ -104,7 +106,10 @@ public class EnemyData : ScriptableObject
     [SerializeField, Range(0.05f, 1f)] float normalDamageScale = 0.35f; // 평소(체간 붕괴 전) 받는 피해 배율 → 체간을 무너뜨려야 크게 깎임
     [SerializeField] float brokenDamageScale = 1.5f;                    // 체간 붕괴 중 받는 피해 배율 (처형 피해는 별도)
     [SerializeField, Range(0.01f, 1f)] float instantKillDamageRatio = 0.12f; // 일섬 즉사(뇌인 가득)는 보스에게 이 비율 피해
-    [SerializeField, Range(0.1f, 0.9f)] float phase2Ratio = 0.5f;
+    [SerializeField, Range(0.1f, 0.9f)] float phase2Ratio = 0.5f; // 2페이즈 부활 때 회복하는 체력 비율
+    [SerializeField] float reviveFallTime = 1.6f;   // 쓰러져 있는 시간
+    [SerializeField] float reviveFillTime = 1.6f;   // 일어나며 체력이 차오르는 시간
+    [SerializeField] bool introPortal = true;       // 첫 등장: 레터박스 + 포탈에서 걸어 나옴
     [SerializeField] float phase2Speed = 1.15f;       // 2페이즈 동작 배속
     [SerializeField] float phase2CooldownScale = 0.7f;
     [SerializeField] float roarTime = 1.8f;
@@ -162,7 +167,7 @@ public class EnemyData : ScriptableObject
     [SerializeField] float wavePhase1CooldownScale = 1.5f;
     [SerializeField] float phase2WaveSpread = 20f;        // 2페이즈 검기를 이 각도로 세 갈래 (0이면 한 줄기)
 
-    // [변경] 2페이즈 새 패턴 (EnemySwordsman.BossSkills.cs)
+    // 2페이즈 새 패턴 (EnemySwordsman.BossSkills.cs)
     // 뇌광 연참: 바닥에 선 예고 → 번개처럼 일직선으로 꿰뚫고 지나감 × dashCount (회피 · 점프로만), 끝나면 잠깐 숨 고름
     [Header("Boss · Lightning Dash (2페이즈)")]
     [SerializeField] int dashCount = 3;
@@ -188,6 +193,15 @@ public class EnemyData : ScriptableObject
     [SerializeField] float rainScatter = 1.5f;      // 첫 원 뒤로는 플레이어 주변에 흩뿌림
     [SerializeField] float rainMinDistance = 4f;
     [SerializeField] float rainCooldown = 16f;
+
+    // 2페이즈 도약: 더 높이 떠서 착지 순간 사방 8갈래 검기 → radialDelay 뒤 22.5° 돌린 8갈래 한 번 더 (갈래 사이 틈으로 피함)
+    [Header("Boss · Radial Waves (2페이즈 도약)")]
+    [SerializeField] float phase2LeapHeightScale = 1.8f;
+    [SerializeField] float phase2LeapAirScale = 1.2f;
+    [SerializeField] int radialCount = 8;
+    [SerializeField] float radialDelay = 0.5f;
+    [SerializeField] float radialSpeedScale = 0.75f;
+    [SerializeField] float radialWidth = 1.4f;
 
     public EnemyKind Kind => kind;
     public float MaxHealth => maxHealth;
@@ -269,6 +283,17 @@ public class EnemyData : ScriptableObject
     public float BrokenDamageScale => brokenDamageScale;
     public float InstantKillDamageRatio => instantKillDamageRatio;
     public float Phase2Ratio => phase2Ratio;
+    public float ReviveFallTime => reviveFallTime;
+    public float ReviveFillTime => reviveFillTime;
+    public bool IntroPortal => introPortal;
+    public bool ParryTell => parryTell;
+    public float ParryTellLead => parryTellLead;
+    public float Phase2LeapHeightScale => phase2LeapHeightScale;
+    public float Phase2LeapAirScale => phase2LeapAirScale;
+    public int RadialCount => radialCount;
+    public float RadialDelay => radialDelay;
+    public float RadialSpeedScale => radialSpeedScale;
+    public float RadialWidth => radialWidth;
     public float Phase2Speed => phase2Speed;
     public float Phase2CooldownScale => phase2CooldownScale;
     public float RoarTime => roarTime;

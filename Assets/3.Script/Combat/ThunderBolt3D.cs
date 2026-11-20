@@ -5,18 +5,27 @@ using UnityEngine;
 //  가는 흰 심 + 넓고 옅은 푸른 빛 껍질 + 곁가지 2~3개, 짧게 2~3번 모양을 바꾸며 깜빡이다 사라짐, 바닥에 순간 불빛
 //  카메라 가까이 지나가는 낙뢰는 빛 껍질을 끄고 흐리게 (화면을 하얗게 덮지 않게)
 // 사용: ThunderBolt3D.Strike(하늘, 바닥, 굵기 배율, 곁가지 수). 오브젝트는 재사용(풀)
-// [변경] 긴 낙뢰(뇌신강림)가 매끈한 네온 막대처럼 보여 이질적 → 더 많이 꺾고, 빛 껍질을 가늘고 옅게, 긴 줄기엔 곁가지를 더
+// 긴 낙뢰(뇌신강림)가 매끈한 네온 막대처럼 보여 이질적 → 더 많이 꺾고, 빛 껍질을 가늘고 옅게, 긴 줄기엔 곁가지를 더
 public class ThunderBolt3D : MonoBehaviour
 {
     const int Sides = 6;
     const float Life = 0.26f;
     const float CoreRadius = 0.045f;
-    const float GlowRadius = 0.14f; // [변경] 0.32 → 0.14 (굵은 막대 느낌 제거)
+    const float GlowRadius = 0.14f; // 0.32 → 0.14 (굵은 막대 느낌 제거)
     const float NearCamera = 6f;
 
     static readonly Color CoreColor = new Color(2.4f, 2.7f, 4f, 1f);    // HDR → 블룸으로 번짐
-    static readonly Color GlowColor = new Color(0.55f, 0.7f, 1.5f, 0.13f); // [변경] 옅게
+    static readonly Color GlowColor = new Color(0.55f, 0.7f, 1.5f, 0.13f); // 옅게
     static Material coreMaterial, glowMaterial;
+
+    // [변경] 보스 흑뢰 전용 검붉은 번개: 검은 심 + 붉은 빛 껍질 / 붉은 심 + 검은 껍질 두 가지를 섞어 씀
+    static readonly Color DarkCoreA = new Color(0.04f, 0f, 0.01f, 1f);
+    static readonly Color DarkGlowA = new Color(2.2f, 0.12f, 0.06f, 0.35f);
+    static readonly Color DarkCoreB = new Color(2.6f, 0.18f, 0.08f, 1f);
+    static readonly Color DarkGlowB = new Color(0.02f, 0f, 0f, 0.55f);
+    static readonly Color DarkFlash = new Color(1f, 0.2f, 0.12f);
+    static readonly Color BlueFlash = new Color(0.65f, 0.75f, 1f);
+    Color coreColor = CoreColor, glowColor = GlowColor;
     static readonly Stack<ThunderBolt3D> pool = new Stack<ThunderBolt3D>();
 
     MeshRenderer coreRenderer, glowRenderer;
@@ -36,7 +45,22 @@ public class ThunderBolt3D : MonoBehaviour
     {
         ThunderBolt3D bolt = pool.Count > 0 ? pool.Pop() : Create();
         if (bolt == null) bolt = Create();
+        bolt.coreColor = CoreColor;
+        bolt.glowColor = GlowColor;
+        bolt.flash.color = BlueFlash;
         bolt.Begin(sky, ground, thickness, branches);
+    }
+
+    // [변경] 검붉은 번개 (보스 흑뢰). 두 배색 중 하나를 무작위로 → 여러 줄기가 섞이면 검정 · 빨강이 엇갈려 보임
+    public static void StrikeDark(Vector3 sky, Vector3 ground, float thickness = 1f, int branches = 2)
+    {
+        ThunderBolt3D bolt = pool.Count > 0 ? pool.Pop() : Create();
+        if (bolt == null) bolt = Create();
+        bool blackCore = Random.value < 0.5f;
+        bolt.coreColor = blackCore ? DarkCoreA : DarkCoreB;
+        bolt.glowColor = blackCore ? DarkGlowA : DarkGlowB;
+        bolt.flash.color = DarkFlash;
+        bolt.Begin(sky, ground, thickness * 1.15f, branches);
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -71,7 +95,7 @@ public class ThunderBolt3D : MonoBehaviour
         lightGo.transform.SetParent(transform, false);
         flash = lightGo.AddComponent<Light>();
         flash.type = LightType.Point;
-        flash.color = new Color(0.65f, 0.75f, 1f);
+        flash.color = BlueFlash;
         flash.shadows = LightShadows.None;
         gameObject.SetActive(false);
     }
@@ -131,10 +155,10 @@ public class ThunderBolt3D : MonoBehaviour
         float k = age / Life;
         float flicker = Mathf.Lerp(1f, 0.35f, k) * (Random.value < 0.25f ? 0.55f : 1f);
         float core = flicker * Mathf.Lerp(0.35f, 1f, nearFade);
-        block.SetColor("_Color", new Color(CoreColor.r * core, CoreColor.g * core, CoreColor.b * core, 1f));
+        block.SetColor("_Color", new Color(coreColor.r * core, coreColor.g * core, coreColor.b * core, 1f));
         coreRenderer.SetPropertyBlock(block);
         float glow = flicker * nearFade;
-        block.SetColor("_Color", new Color(GlowColor.r, GlowColor.g, GlowColor.b, GlowColor.a * glow));
+        block.SetColor("_Color", new Color(glowColor.r, glowColor.g, glowColor.b, glowColor.a * glow));
         glowRenderer.SetPropertyBlock(block);
         glowRenderer.enabled = glow > 0.02f;
         flash.intensity = 7f * (1f - k) * (1f - k) * thickness;
@@ -144,10 +168,10 @@ public class ThunderBolt3D : MonoBehaviour
     {
         verts.Clear();
         tris.Clear();
-        MakePath(from, to, 0.17f); // [변경] 0.11 → 0.17 더 꺾이게
+        MakePath(from, to, 0.17f); // 0.11 → 0.17 더 꺾이게
         AddTube(path, CoreRadius * thickness, 0.7f);
         List<Vector3> main = new List<Vector3>(path);
-        int count = branches + Mathf.FloorToInt((to - from).magnitude / 12f); // [변경] 길수록 곁가지 추가
+        int count = branches + Mathf.FloorToInt((to - from).magnitude / 12f); // 길수록 곁가지 추가
         for (int b = 0; b < count; b++)
         {
             int at = Random.Range(main.Count / 5, main.Count * 3 / 4);
@@ -175,7 +199,7 @@ public class ThunderBolt3D : MonoBehaviour
         path.Add(a);
         path.Add(b);
         float offset = (b - a).magnitude * roughness;
-        for (int gen = 0; gen < 6; gen++) // [변경] 5 → 6세대 (잔 꺾임)
+        for (int gen = 0; gen < 6; gen++) // 5 → 6세대 (잔 꺾임)
         {
             for (int i = path.Count - 1; i > 0; i--)
             {

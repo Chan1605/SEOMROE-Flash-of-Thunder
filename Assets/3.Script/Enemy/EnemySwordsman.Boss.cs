@@ -4,7 +4,7 @@ using UnityEngine;
 // 맞아도 경직이 없고 체간(자세)만 쌓임 → 가득 차면 체간 붕괴(처형 기회). 처형은 즉사 대신 최대 체력 비율 피해 → 기상
 // 가까이: 연속 베기(firstAttack 연쇄, 간파·패링 가능) 또는 잡기(붉은 예고, 회피로만 피함)
 // 중거리: 도약 내려찍기(바닥에 범위 예고) · 검기(멀리 날아오는 참격, 1페이즈는 드물게 · 2페이즈는 세 갈래)
-// 체력 phase2Ratio 이하 → 포효(가까우면 밀쳐냄) 후 2페이즈: 동작이 빨라지고 쿨타임이 짧아짐
+// 1페이즈 체력을 다 깎으면 쓰러졌다 일어나며 phase2Ratio까지 회복 → 포효(가까우면 밀쳐냄) 후 2페이즈: 동작이 빨라지고 쿨타임이 짧아짐 // (EnemySwordsman.BossPhase.cs)
 public partial class EnemySwordsman
 {
     static readonly int BossIntroHash = Animator.StringToHash("Boss_Intro");
@@ -92,6 +92,8 @@ public partial class EnemySwordsman
 
     float BossSpeed => IsBoss && phase2 ? data.Phase2Speed : 1f;
     float CooldownScale => IsBoss && phase2 ? data.Phase2CooldownScale : 1f;
+    float LeapAirTime => data.LeapAirTime * (phase2 ? data.Phase2LeapAirScale : 1f); // 2페이즈 도약은 더 높고 길게
+    float LeapHeight => data.LeapHeight * (phase2 ? data.Phase2LeapHeightScale : 1f);
     bool IsBossRanged => state == State.BossLeapWindup || state == State.BossLeapAir;
     Color BaseTint => IsBoss && phase2 ? phase2Tint : bodyTint;
 
@@ -112,7 +114,7 @@ public partial class EnemySwordsman
         ReleaseGrabbedPlayer();
         DestroyTelegraph();
         InitBossAI(); // 개편 상태(간파 쿨타임 · 패링 적응 · 위험 공격) 초기화
-        ResetBossSkills(); // [변경] 새 패턴 쿨타임 · 2페이즈 분위기 되돌림 (연습장 재시작)
+        ResetBossSkills(); // 새 패턴 쿨타임 · 2페이즈 분위기 되돌림 (연습장 재시작)
     }
 
     void OnDisable()
@@ -122,13 +124,14 @@ public partial class EnemySwordsman
         if (!IsBoss) return;
         ReleaseGrabbedPlayer();
         DestroyTelegraph();
-        BossSkillsOnDisable(); // [변경] 낙뢰 원 · 분위기 · 연출 카메라 정리
+        BossSkillsOnDisable(); // 낙뢰 원 · 분위기 · 연출 카메라 정리
     }
 
     // 매 프레임: 체간 자연 회복, 붕괴 경직이 끝나면 체간 초기화
     void UpdateBoss(float dt)
     {
         if (!IsBoss) return;
+        UpdateRadialWaves(); // 팔방 검기 두 번째 고리
         if (postureBroken && state != State.Stun && state != State.Executed)
         {
             postureBroken = false;
@@ -151,6 +154,16 @@ public partial class EnemySwordsman
             bossCamera = FindAnyObjectByType<ThirdPersonCamera>();
             moveSpeed = 0f;
             bool retry = !introSeen.Add(data); // 재도전이면 칼 뽑는 등장을 건너뛰고 바로 싸움
+            if (retry && awaitingIntro) // [변경] 숨겨 둔 보스가 등장 연출 없이 싸우게 되면 바로 보이게
+            {
+                awaitingIntro = false;
+                SetBodyVisible(true);
+            }
+            if (!retry && data.IntroPortal)
+            {
+                StartBossIntro(); // 레터박스 + 포탈에서 걸어 나와 칼을 뽑음
+                return true;
+            }
             if (!retry && animator.HasState(0, BossIntroHash)) animator.CrossFadeInFixedTime(BossIntroHash, 0.15f, 0, 0f);
             stunDuration = retry ? 0.3f : data.IntroTime;
             attackReadyTime = localTime + stunDuration + 0.3f;
@@ -172,7 +185,7 @@ public partial class EnemySwordsman
 
         bool canLeap = data.LeapAttack != null && localTime >= leapReadyTime && dist >= data.LeapMinDistance && dist <= data.LeapMaxDistance;
         bool canWave = (phase2 || data.WavePhase1) && data.WaveAttack != null && localTime >= waveReadyTime && dist >= data.WaveMinDistance; // 1페이즈에도
-        bool canDash = CanBossDash(dist); // [변경] 2페이즈 새 패턴 둘도 같은 후보에서 무작위
+        bool canDash = CanBossDash(dist); // 2페이즈 새 패턴 둘도 같은 후보에서 무작위
         bool canRain = CanBossRain(dist);
         int count = (canLeap ? 1 : 0) + (canWave ? 1 : 0) + (canDash ? 1 : 0) + (canRain ? 1 : 0);
         if (count == 0) return false;
@@ -209,7 +222,7 @@ public partial class EnemySwordsman
         moveSpeed = 0f;
         grabReadyTime = localTime + data.GrabCooldown * CooldownScale;
         SetState(State.BossGrabWindup);
-        BossSound(BossSfx.Cue.GrabTell); // [변경]
+        BossSound(BossSfx.Cue.GrabTell);
         if (grabTell == null) grabTell = BossGrabTell.Create(this, animator); // 손 빛 + 머리 위 글자
         DamageEvents.RaiseLabel(transform.position + Vector3.up * 2.4f * transform.lossyScale.y, "잡기!", GrabLabelColor);
         Log("잡기 예고");
@@ -458,7 +471,7 @@ public partial class EnemySwordsman
         moveSpeed = 0f;
         FaceTarget(dt, 1.5f);
         leapTo = target.position;
-        float total = data.LeapWindup + data.LeapAirTime;
+        float total = data.LeapWindup + LeapAirTime;
         if (telegraph != null)
         {
             telegraph.SetPosition(leapTo);
@@ -476,7 +489,7 @@ public partial class EnemySwordsman
         }
         controller.enabled = false;
         leapLooping = false;
-        BossSound(BossSfx.Cue.LeapJump); // [변경]
+        BossSound(BossSfx.Cue.LeapJump);
         animator.CrossFadeInFixedTime(BossLeapAirHash, 0.08f, 0, 0f);
         SetState(State.BossLeapAir);
     }
@@ -484,12 +497,12 @@ public partial class EnemySwordsman
     void UpdateBossLeapAir(float dt)
     {
         moveSpeed = 0f;
-        float k = Mathf.Clamp01(stateTime / Mathf.Max(0.05f, data.LeapAirTime));
-        Vector3 pos = Vector3.Lerp(leapFrom, leapTo, k) + Vector3.up * (Mathf.Sin(k * Mathf.PI) * data.LeapHeight);
+        float k = Mathf.Clamp01(stateTime / Mathf.Max(0.05f, LeapAirTime));
+        Vector3 pos = Vector3.Lerp(leapFrom, leapTo, k) + Vector3.up * (Mathf.Sin(k * Mathf.PI) * LeapHeight);
         transform.position = pos;
         Vector3 dir = Flat(leapTo - leapFrom);
         if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
-        if (telegraph != null) telegraph.SetProgress((data.LeapWindup + stateTime) / (data.LeapWindup + data.LeapAirTime));
+        if (telegraph != null) telegraph.SetProgress((data.LeapWindup + stateTime) / (data.LeapWindup + LeapAirTime));
         if (!leapLooping && k >= 0.5f)
         {
             leapLooping = true;
@@ -519,7 +532,8 @@ public partial class EnemySwordsman
             });
         }
         if (bossCamera != null) bossCamera.Shake(0.3f, 0.3f);
-        BossSound(BossSfx.Cue.LeapLand); // [변경]
+        if (phase2) FireRadialWaves(true); // 2페이즈 착지 = 팔방 검기 2연속
+        BossSound(BossSfx.Cue.LeapLand);
         attackReadyTime = localTime + data.LeapRecovery + 0.3f;
         SetState(State.BossLeapLand);
     }
@@ -536,7 +550,7 @@ public partial class EnemySwordsman
     {
         if (telegraph != null) Destroy(telegraph.gameObject);
         telegraph = null;
-        CancelBossSkills(); // [변경] 뇌광 연참 선 예고 · 끊긴 돌진 정리 (낙뢰 원은 이미 떨어지는 중이면 그대로)
+        CancelBossSkills(); // 뇌광 연참 선 예고 · 끊긴 돌진 정리 (낙뢰 원은 이미 떨어지는 중이면 그대로)
     }
 
     // ===== 검기 =====
@@ -555,7 +569,7 @@ public partial class EnemySwordsman
         dir = dir.sqrMagnitude > 0.01f ? dir.normalized : transform.forward;
         float s = transform.lossyScale.x;
         Vector3 origin = transform.position + Vector3.up * 1.1f * s + dir * 0.8f * s;
-        BossSound(BossSfx.Cue.Wave); // [변경]
+        BossSound(BossSfx.Cue.Wave);
         // 2페이즈는 가운데 + 좌우로 세 갈래 → 옆으로 비켜서는 것만으론 못 피함 (회피 · 점프)
         int count = phase2 && data.Phase2WaveSpread > 0f ? 3 : 1;
         for (int i = 0; i < count; i++)
@@ -589,7 +603,7 @@ public partial class EnemySwordsman
             bossCamera.Shake(0.25f, 0.6f);
             bossCamera.Punch(0.12f, 0.15f, 0.4f, 0.5f, 0f);
         }
-        BeginPhase2Show(); // [변경] 정면 컷 · 주변 낙뢰 · 하늘 어두워짐 · 칼에 번개
+        BeginPhase2Show(); // 정면 컷 · 주변 낙뢰 · 하늘 어두워짐 · 칼에 번개
 
         // 가까이 있으면 밀쳐 넘어뜨림 (피해는 작게)
         Vector3 to = target.position - transform.position;
@@ -613,7 +627,7 @@ public partial class EnemySwordsman
     void UpdateBossRoar()
     {
         moveSpeed = 0f;
-        UpdatePhase2Show(); // [변경]
+        UpdatePhase2Show();
         if (stateTime < data.RoarTime) return;
         EndPhase2Show();
         attackReadyTime = localTime + 0.4f;
@@ -624,6 +638,7 @@ public partial class EnemySwordsman
     // ===== 피해 · 체간 =====
     HitResult BossReceiveDamage(DamageInfo info)
     {
+        if (reviving || state == State.BossIntro || awaitingIntro) return HitResult.Ignored; // 부활 · 등장 연출 중 · 등장 전엔 무적
         if (TryDeflectSkill(info)) return HitResult.Blocked; // 섬뢰일도를 쿨타임마다 튕겨내고 반격
         float max = data.MaxHealth * healthScale;
         float damage = info.Damage;
@@ -646,10 +661,10 @@ public partial class EnemySwordsman
         if (state != State.Executed) Flinch(info.Direction, info.Weight != AttackWeight.Light); // 보스도 맞으면 움찔
         if (health <= 0f)
         {
-            Die();
+            if (CanRevive) BeginRevive(); // 1페이즈는 쓰러졌다가 2페이즈로 일어남
+            else Die();
             return HitResult.Hit;
         }
-        if (!phase2 && health <= max * data.Phase2Ratio) pendingPhase2 = true;
         if (state == State.Executed) return HitResult.Hit;
 
         AddPosture(info.PostureDamage * data.PostureTakenScale, info.Direction); // 일섬 한 방(체간 100)에 바로 붕괴하던 것 → 배율로 낮춤
@@ -677,7 +692,8 @@ public partial class EnemySwordsman
     }
 
     bool CanBreakNow() =>
-        state != State.BossRoar && state != State.BossLeapAir && state != State.BossDash && state != State.Executed && state != State.Dead // [변경] 돌진 중엔 끝난 뒤 붕괴
+        state != State.BossRoar && state != State.BossLeapAir && state != State.BossDash && state != State.Executed && state != State.Dead // 돌진 중엔 끝난 뒤 붕괴
+        && state != State.BossRevive && state != State.BossIntro
         && !(state == State.BossGrab && grabConnected);
 
     void BreakPosture(Vector3 hitDirection)
@@ -707,7 +723,7 @@ public partial class EnemySwordsman
     // ===== 처형 뒤 기상 =====
     bool BossExecutedFinished()
     {
-        if (!IsBoss || health <= 0f || stateTime < 0.5f) return false;
+        if (!IsBoss || (health <= 0f && !reviving) || stateTime < 0.5f) return false; // 처형으로 1페이즈를 끝냈으면 짝 모션 뒤 부활
         if (stateTime > 10f) return true;
         AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
         foreach (int hash in ExecutedHashes)
@@ -722,6 +738,12 @@ public partial class EnemySwordsman
         controller.enabled = true;
         postureBroken = false;
         posture = 0f;
+        if (reviving) // 처형 짝 모션이 끝난 자리(누운 채)에서 바로 일어나며 부활
+        {
+            SetState(State.BossRevive);
+            stateTime = data.ReviveFallTime;
+            return;
+        }
         if (animator.HasState(0, BossGetUpHash)) animator.CrossFadeInFixedTime(BossGetUpHash, 0.15f, 0, 0f);
         stunDuration = 1.6f;
         attackReadyTime = localTime + 2f;
@@ -734,7 +756,7 @@ public partial class EnemySwordsman
         if (!IsBoss) return;
         ReleaseGrabbedPlayer();
         DestroyTelegraph();
-        BossDeathShow(); // [변경] 슬로 · 낙뢰 · 분위기 복구 · 쓰러지는 소리
+        BossDeathShow(); // 슬로 · 낙뢰 · 분위기 복구 · 쓰러지는 소리
     }
 
     // ===== 간파·저스트 회피 판정용 =====
@@ -745,9 +767,9 @@ public partial class EnemySwordsman
         {
             case State.BossGrabWindup: return Mathf.Max(0f, data.GrabWindup - stateTime);
             case State.BossGrab: return grabConnected || grabDodged ? -1f : 0f;
-            case State.BossLeapWindup: return Mathf.Max(0f, data.LeapWindup - stateTime) + data.LeapAirTime;
-            case State.BossLeapAir: return Mathf.Max(0f, data.LeapAirTime - stateTime);
-            case State.BossDashWindup: return Mathf.Max(0f, dashWindupTime - stateTime); // [변경]
+            case State.BossLeapWindup: return Mathf.Max(0f, data.LeapWindup - stateTime) + LeapAirTime;
+            case State.BossLeapAir: return Mathf.Max(0f, LeapAirTime - stateTime);
+            case State.BossDashWindup: return Mathf.Max(0f, dashWindupTime - stateTime);
             case State.BossDash: return dashHitDone ? -1f : 0f;
         }
         return -1f;
@@ -758,7 +780,7 @@ public partial class EnemySwordsman
         if (!IsBoss) return null;
         if (state == State.BossGrabWindup || state == State.BossGrab) return data.GrabAttack;
         if (IsBossRanged) return data.LeapAttack;
-        if (IsBossDashing) return data.GrabAttack; // [변경] 패링 불가 데이터 재사용 (회피 · 점프만)
+        if (IsBossDashing) return data.GrabAttack; // 패링 불가 데이터 재사용 (회피 · 점프만)
         return null;
     }
 
@@ -785,7 +807,7 @@ public partial class EnemySwordsman
             case State.BossRoar:
                 color = Color.Lerp(phase2Tint, grabTellColor, pulse);
                 return true;
-            case State.BossDashWindup: // [변경] 뇌광 연참 예고 = 푸른 번개빛
+            case State.BossDashWindup: // 뇌광 연참 예고 = 푸른 번개빛
             case State.BossDash:
                 color = Color.Lerp(BaseTint, dashTellColor, state == State.BossDash ? 1f : 0.45f + 0.55f * pulse);
                 return true;

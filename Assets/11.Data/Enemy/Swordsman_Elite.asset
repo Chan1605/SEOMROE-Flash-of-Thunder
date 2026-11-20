@@ -40,3 +40,4 @@ MonoBehaviour:
   evadeChance: 0.4
   counterChance: 0.7
   lungeChance: 0.6
+  parryTell: 1

@@ -2,13 +2,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 발도 자세 (첫 작품 SummonerForest3D의 조준형 일섬을 재해석)
-//  - Q 홀드(2칸): 발도 자세. 적만 거의 멈추고 화면이 흑백, 조준점을 적에게 올려두면 표식 → 떼면 표식 순서대로 자동 연쇄
+//  - Q 홀드(2칸): 발도 자세. 적만 거의 멈추고 화면이 흑백, 조준점을 적에게 올려두면 표식 → 떼면 표식한 적들을 지그재그로 자동 연쇄 // [변경]
 //  - 저스트 회피 직후 Q: 비용 없이, 조준 없이 주변 적을 자동 표식해 바로 발도 // 조준 단계 생략
 //  - 뇌검 각성 중 Q: 각성 시간 n초를 떼어 "발도 시간"을 열고, 그동안 Q마다 비용 없이 발도 자세 (탭 Q 대신)
 // 탭 Q(1칸)는 한 명만 벰 (tapChain) // 11/9 테스트 결과 반영
 public partial class PlayerSkill
 {
-    enum StanceEntry { None, Hold, Dodge, Enchant } // [변경] 궁극기 진입(Ultimate) 제거 — 뇌신강림이 자체 연출로 바뀜
+    enum StanceEntry { None, Hold, Dodge, Enchant } // 궁극기 진입(Ultimate) 제거 — 뇌신강림이 자체 연출로 바뀜
 
     [Header("Draw Stance")] // 수치는 SkillData(ThunderFlash.asset)로 옮김. 여기엔 켜기/끄기와 연결만
     [SerializeField] bool drawStance = true;
@@ -19,6 +19,8 @@ public partial class PlayerSkill
 
     readonly List<IDamageable> stanceMarks = new List<IDamageable>();
     readonly Queue<IDamageable> stanceQueue = new Queue<IDamageable>();
+    readonly List<IDamageable> stanceLeft = new List<IDamageable>();
+    float lastStanceTurn; // [변경] 지난 돌진이 꺾인 쪽 (+1 오른쪽 · -1 왼쪽 · 0 첫 돌진)
     StanceEntry stanceEntry;
     float stanceTimer;
     IDamageable markingTarget;
@@ -50,13 +52,13 @@ public partial class PlayerSkill
     void OnJustDodged() => lastJustDodgeTime = Time.unscaledTime;
 
     // 누르는 순간 바로 발도 자세로 들어갈 조건 (각성 중 · 저스트 회피 직후)
+    // 저스트 회피 직후가 먼저 → 각성(R) 중이어도 회피 직후 Q는 조준 없이 회피 발도 (평소와 같음)
     StanceEntry InstantStanceEntry()
     {
         // 각성 발도 · 회피 발도는 스킬트리에서 해금해야 함
-        if (enchantStance && SkillTree.IsUnlocked(SkillId.EnchantDraw) && enchant != null && (enchantWindow > 0f || enchant.IsActive)) return StanceEntry.Enchant;
-        // 저스트 회피 직후는 비용 0이 기본 (값을 올리면 그만큼 확인)
         if (dodgeStance && SkillTree.IsUnlocked(SkillId.DodgeDraw) && Time.unscaledTime - lastJustDodgeTime <= data.DodgeStanceWindow
             && (!UsesGauge || thunder.CanSpend(data.DodgeStanceCost))) return StanceEntry.Dodge;
+        if (enchantStance && SkillTree.IsUnlocked(SkillId.EnchantDraw) && enchant != null && (enchantWindow > 0f || enchant.IsActive)) return StanceEntry.Enchant;
         return StanceEntry.None;
     }
 
@@ -231,6 +233,7 @@ public partial class PlayerSkill
         PayStance();
         foreach (IDamageable mark in stanceMarks) stanceQueue.Enqueue(mark);
         stanceChain = true;
+        lastStanceTurn = 0f;
 
         IDamageable first = NextStanceTarget();
         if (first == null)
@@ -257,14 +260,43 @@ public partial class PlayerSkill
     }
 
     // 이미 쓰러졌거나 앞 돌진 경로에서 베인 표식은 건너뜀
+    // [변경] 표식 순서(1, 2, 3…) 대신 지그재그: 남은 표식 중 지난번과 반대쪽으로 크게 꺾이는 적을 무작위 섞어 고름
     IDamageable NextStanceTarget()
     {
+        stanceLeft.Clear();
         while (stanceQueue.Count > 0)
         {
             IDamageable next = stanceQueue.Dequeue();
-            if (IsValidTarget(next) && !IsPending(next)) return next;
+            if (IsValidTarget(next) && !IsPending(next)) stanceLeft.Add(next);
         }
-        return null;
+        if (stanceLeft.Count == 0) return null;
+
+        IDamageable pick = PickZigzag();
+        foreach (IDamageable t in stanceLeft)
+            if (t != pick) stanceQueue.Enqueue(t);
+        return pick;
+    }
+
+    // 점수 = 무작위 + 꺾이는 각도 + (지난번과 반대쪽이면 가산) → 좌우로 번갈아 튀는 궤적
+    IDamageable PickZigzag()
+    {
+        Vector3 forward = Flat(transform.forward);
+        IDamageable pick = stanceLeft[0];
+        float best = float.MinValue, pickedSide = 0f;
+        foreach (IDamageable t in stanceLeft)
+        {
+            Vector3 to = Flat(((Component)t).transform.position - transform.position);
+            float angle = to.sqrMagnitude > 0.01f ? Vector3.SignedAngle(forward, to, Vector3.up) : 0f;
+            float side = Mathf.Sign(angle);
+            float score = Random.value * 1.2f + Mathf.Abs(angle) / 180f;
+            if (lastStanceTurn != 0f && side != lastStanceTurn) score += 1f;
+            if (score <= best) continue;
+            best = score;
+            pick = t;
+            pickedSide = side;
+        }
+        lastStanceTurn = pickedSide;
+        return pick;
     }
 
     // 표식 연쇄: 착지 후 짧은 간격 뒤 다음 표식으로 자동 돌진

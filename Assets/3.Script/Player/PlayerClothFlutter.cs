@@ -11,8 +11,9 @@ using UnityEngine;
 public class PlayerClothFlutter : MonoBehaviour
 {
     [SerializeField] string[] hemSources = { "hakama" };
-    [SerializeField] float hemTop = 0.12f;   // 골반 아래 다리 길이의 이 비율부터 자락 (위쪽은 몸판에 남음)
-    [SerializeField] float hemFree = 0.2f;   // 자락 끝이 벗어날 수 있는 거리(m)
+    [SerializeField] float hemTop = 0.12f;
+    [SerializeField] float hemFree = 0.2f;
+    [SerializeField] bool hemActive = false; // [변경] 생성 직후 자락 오브젝트 활성 여부
 
     [SerializeField] string[] flutterMeshes = { "fabric", "belt1", "belt2" };
     [SerializeField] float[] flutterFree = { 0.26f, 0.24f, 0.24f }; // 아랫단 끝이 원래 자리에서 벗어날 수 있는 거리(m)
@@ -37,7 +38,9 @@ public class PlayerClothFlutter : MonoBehaviour
         {
             if (System.Array.IndexOf(hemSources, smr.name) < 0 || !smr.enabled) continue;
             SkinnedMeshRenderer hem = SplitHem(smr);
-            if (hem != null) hems.Add(hem);
+            if (hem == null) continue;
+            hems.Add(hem);
+            hem.gameObject.SetActive(hemActive); // [변경] 만들고 바로 끔
         }
     }
 
@@ -55,7 +58,9 @@ public class PlayerClothFlutter : MonoBehaviour
             if (index < 0 || !smr.enabled || smr.sharedMesh == null) continue;
             pending.Add((Attach(smr), smr, index < flutterFree.Length ? flutterFree[index] : 0.2f, 0f));
         }
-        foreach (SkinnedMeshRenderer hem in hems) pending.Add((Attach(hem), hem, hemFree, hemTop));
+        // [변경] 꺼진 자락엔 Cloth를 붙이지 않음 (비활성 상태에선 정점 정보가 비어 높이 계산이 틀어짐)
+        foreach (SkinnedMeshRenderer hem in hems)
+            if (hem.gameObject.activeSelf) pending.Add((Attach(hem), hem, hemFree, hemTop));
         yield return null;
         yield return null;
 

@@ -36,7 +36,7 @@ public class BossRainStrike : MonoBehaviour
     {
         Vector3 ground = marker != null ? marker.transform.position : transform.position;
         Vector2 j = Random.insideUnitCircle * 3f;
-        ThunderBolt3D.Strike(ground + new Vector3(j.x, 26f, j.y), ground, 1.25f, 3);
+        ThunderBolt3D.StrikeDark(ground + new Vector3(j.x, 26f, j.y), ground, 1.25f, 3); // [변경] 검붉은 번개
         if (sfx != null) sfx.PlayAt(BossSfx.Cue.Thunder, ground, 0.8f);
 
         if (player == null) return;

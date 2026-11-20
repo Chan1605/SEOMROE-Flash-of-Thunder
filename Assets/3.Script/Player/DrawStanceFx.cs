@@ -7,7 +7,7 @@ using UnityEngine.UI;
 // 발도 자세 연출 (PlayerSkill이 실행 중 자동으로 붙임, 셋업 불필요)
 //  - 화면 흑백 + 비네트 (UI는 후처리를 안 받으므로 표식만 색이 남음)
 //  - 화면 중앙 조준 링 + 남은 시간 링
-//  - 조준 중인 적: 차오르는 원형 게이지 / 표식이 붙은 적: 순서 번호
+//  - 조준 중인 적: 차오르는 원형 게이지 / 표식이 붙은 적: [변경] 숫자 대신 마름모 표식 (붙는 순간 튀어 나오고 천천히 흔들림, 벤 표식은 흐려지고 사선)
 // 전투 코드는 이 연출을 모르고, 여기서 PlayerSkill의 상태를 읽기만 함
 public class DrawStanceFx : MonoBehaviour
 {
@@ -26,11 +26,11 @@ public class DrawStanceFx : MonoBehaviour
 
     RectTransform canvasRect;
     Image reticle, timerRing, markingRing;
-    readonly List<Image> markRings = new List<Image>(); // [변경] 각성 발도는 표식 수 제한이 없어 필요한 만큼 늘림
-    readonly List<Text> markNumbers = new List<Text>();
-    Font markFont;
+    readonly List<Image> markRings = new List<Image>(); // 각성 발도는 표식 수 제한이 없어 필요한 만큼 늘림
+    readonly List<Image> markSlashes = new List<Image>(); // [변경] 번호 대신 벤 표식에 긋는 사선
+    readonly List<float> markShownAt = new List<float>();
     Text hint;
-    static Sprite ringSprite, discSprite;
+    static Sprite ringSprite, discSprite, markSprite, slashSprite;
 
     void Awake()
     {
@@ -77,18 +77,25 @@ public class DrawStanceFx : MonoBehaviour
         markingRing.enabled = marking != null && Place(markingRing.rectTransform, marking);
         if (markingRing.enabled) markingRing.fillAmount = skill.StanceMarkProgress;
 
-        // 표식: 순서 번호 (이미 벤 표식은 흐리게)
+        // [변경] 표식: 마름모. 붙는 순간 크게 튀었다 자리 잡고, 천천히 흔들림. 이미 벤 표식은 흐려지고 사선
         bool showMarks = skill.ShowStanceMarks;
-        while (showMarks && markRings.Count < skill.StanceMarkCount) AddMark(); // [변경]
+        while (showMarks && markRings.Count < skill.StanceMarkCount) AddMark();
+        float now = Time.unscaledTime;
         for (int i = 0; i < markRings.Count; i++)
         {
             Transform t = showMarks && i < skill.StanceMarkCount ? skill.StanceMark(i) : null;
             bool visible = t != null && Place(markRings[i].rectTransform, t);
-            markRings[i].enabled = markNumbers[i].enabled = visible;
+            if (visible && !markRings[i].enabled) markShownAt[i] = now;
+            markRings[i].enabled = visible;
+            bool done = visible && skill.StanceMarkDone(i);
+            markSlashes[i].enabled = done;
             if (!visible) continue;
-            bool done = skill.StanceMarkDone(i);
+
+            float age = now - markShownAt[i];
+            float pop = age < 0.2f ? Mathf.Lerp(1.9f, 1f, 1f - Mathf.Pow(1f - age / 0.2f, 3f)) : 1f + 0.06f * Mathf.Sin(now * 6f + i);
+            markRings[i].rectTransform.localScale = Vector3.one * (done ? 0.85f : pop);
+            markRings[i].rectTransform.localRotation = Quaternion.Euler(0f, 0f, done ? 0f : Mathf.Sin(now * 2.2f + i * 1.7f) * 8f);
             markRings[i].color = done ? doneColor : markColor;
-            markNumbers[i].color = done ? doneColor : Color.white; // 숫자는 흰색 유지
         }
     }
 
@@ -149,8 +156,9 @@ public class DrawStanceFx : MonoBehaviour
         hint.rectTransform.anchoredPosition = new Vector2(0f, -120f);
         hint.rectTransform.sizeDelta = new Vector2(600f, 40f);
 
-        markFont = font;
-        for (int i = 0; i < 6; i++) AddMark(); // [변경] 기본 6개를 미리 만들고, 더 필요하면 LateUpdate에서 추가
+        if (markSprite == null) markSprite = MakeMarkSprite(); // [변경]
+        if (slashSprite == null) slashSprite = MakeSlashSprite();
+        for (int i = 0; i < 6; i++) AddMark(); // 기본 6개를 미리 만들고, 더 필요하면 LateUpdate에서 추가
 
         reticle.enabled = timerRing.enabled = markingRing.enabled = hint.enabled = false;
     }
@@ -158,16 +166,61 @@ public class DrawStanceFx : MonoBehaviour
     void AddMark()
     {
         int n = markRings.Count + 1;
-        Image ring = NewImage("Mark" + n, discSprite, markColor);
-        ring.rectTransform.sizeDelta = Vector2.one * (markSize * 0.6f);
-        Text number = NewText("No", markFont, 22, Color.white); // 빨간 바탕이라 흰 숫자
-        number.transform.SetParent(ring.transform, false);
-        number.rectTransform.anchoredPosition = Vector2.zero;
-        number.text = n.ToString();
-        ring.enabled = number.enabled = false;
-        markRings.Add(ring);
-        markNumbers.Add(number);
+        Image mark = NewImage("Mark" + n, markSprite, markColor); // [변경] 마름모 표식 + 벤 뒤 사선
+        mark.rectTransform.sizeDelta = Vector2.one * (markSize * 0.85f);
+        Image slash = NewImage("Slash", slashSprite, new Color(1f, 1f, 1f, 0.9f));
+        slash.transform.SetParent(mark.transform, false);
+        slash.rectTransform.anchoredPosition = Vector2.zero;
+        slash.rectTransform.sizeDelta = Vector2.one * (markSize * 1.05f);
+        mark.enabled = slash.enabled = false;
+        markRings.Add(mark);
+        markSlashes.Add(slash);
+        markShownAt.Add(0f);
     }
+
+    // [변경] 표식 모양: 바깥 마름모 테두리 + 네 꼭짓점 밖으로 짧은 침 + 가운데 작은 마름모 (흑백 화면에서 빨갛게 또렷이)
+    static Sprite MakeMarkSprite()
+    {
+        const int size = 128;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var pixels = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+                float d = Mathf.Abs(u) + Mathf.Abs(v); // 마름모 거리
+                float frame = Mathf.Clamp01(1f - Mathf.Abs(d - 0.62f) / 0.06f);
+                float core = Mathf.Clamp01((0.22f - d) / 0.03f);
+                float axis = Mathf.Min(Mathf.Abs(u), Mathf.Abs(v)); // 가로 · 세로 축 위
+                float spike = d > 0.72f && d < 0.98f ? Mathf.Clamp01(1f - axis / 0.035f) : 0f;
+                float a = Mathf.Max(frame, Mathf.Max(core, spike));
+                pixels[y * size + x] = new Color32(255, 255, 255, (byte)(255f * a));
+            }
+        tex.SetPixels32(pixels);
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    // 벤 표식에 긋는 사선 (왼쪽 아래 → 오른쪽 위, 가운데가 굵고 양끝이 가늚)
+    static Sprite MakeSlashSprite()
+    {
+        const int size = 128;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var pixels = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+                float along = (u + v) * 0.7071f, across = Mathf.Abs(u - v) * 0.7071f;
+                float width = 0.07f * Mathf.Clamp01(1f - Mathf.Abs(along) / 0.95f);
+                float a = Mathf.Clamp01(1f - across / Mathf.Max(0.001f, width));
+                pixels[y * size + x] = new Color32(255, 255, 255, (byte)(255f * a));
+            }
+        tex.SetPixels32(pixels);
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
 
     Image NewImage(string name, Sprite sprite, Color color)
     {

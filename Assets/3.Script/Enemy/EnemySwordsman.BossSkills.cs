@@ -46,6 +46,7 @@ public partial class EnemySwordsman
 
     void ResetBossSkills()
     {
+        ResetBossPhase(); // 부활 · 팔방 검기 · 등장 연출 정리
         dashReady = rainReady = 0f;
         CancelBossSkills();
         ClearRain();
@@ -55,6 +56,7 @@ public partial class EnemySwordsman
 
     void BossSkillsOnDisable()
     {
+        ResetBossPhase();
         EndPhase2Show();
         CancelBossSkills();
         ClearRain();
@@ -151,7 +153,7 @@ public partial class EnemySwordsman
     {
         moveSpeed = 0f;
         IgnorePlayer(false);
-        ThunderBolt3D.Strike(dashFrom + Vector3.up * 1.2f, transform.position + Vector3.up * 1.2f, 0.9f, 3); // 지나간 길에 번개
+        ThunderBolt3D.StrikeDark(dashFrom + Vector3.up * 1.2f, transform.position + Vector3.up * 1.2f, 0.9f, 3); // [변경] 검붉은 번개 · 지나간 길에 번개
         if (bossCamera != null) bossCamera.Shake(0.12f, 0.15f);
         dashLeft--;
         if (dashLeft > 0)
@@ -284,7 +286,7 @@ public partial class EnemySwordsman
             Vector3 p = roarStrikeIndex == 0 ? c
                 : c + Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward * Random.Range(4f, 8f);
             Vector2 j = Random.insideUnitCircle * 4f;
-            ThunderBolt3D.Strike(p + new Vector3(j.x, 28f, j.y), p, roarStrikeIndex == 0 ? 1.6f : 1.1f, 3);
+            ThunderBolt3D.StrikeDark(p + new Vector3(j.x, 28f, j.y), p, roarStrikeIndex == 0 ? 1.6f : 1.1f, 3); // [변경] 검붉은 번개
             BossSound(BossSfx.Cue.Thunder);
             if (bossCamera != null) bossCamera.Shake(0.15f, 0.2f);
             roarStrikeIndex++;
@@ -303,7 +305,7 @@ public partial class EnemySwordsman
         EndPhase2Show();
         ClearRain();
         Vector3 c = transform.position;
-        ThunderBolt3D.Strike(c + new Vector3(2f, 30f, -1f), c, 1.8f, 4);
+        ThunderBolt3D.StrikeDark(c + new Vector3(2f, 30f, -1f), c, 1.8f, 4); // [변경] 검붉은 번개
         BossSound(BossSfx.Cue.Death);
         if (bossCamera != null) bossCamera.Shake(0.3f, 0.5f);
         if (phaseFx != null) phaseFx.Exit(false);

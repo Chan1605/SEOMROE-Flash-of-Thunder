@@ -49,7 +49,7 @@ public class VillagePortal : MonoBehaviour
 
     public static bool TutorialDone => RunState.HasFlag(TutorialDoneFlag) || TutorialDirector.CompletedBefore;
 
-    bool UseAlt => !string.IsNullOrEmpty(altScene); // [변경] 새 게임은 항상 수련장부터라 마을에선 수련을 마친 뒤 → 수련장 포탈은 늘 연습장
+    bool UseAlt => !string.IsNullOrEmpty(altScene); // 새 게임은 항상 수련장부터라 마을에선 수련을 마친 뒤 → 수련장 포탈은 늘 연습장
     string TargetScene => UseAlt ? altScene : sceneName;
     string TargetName => UseAlt && !string.IsNullOrEmpty(altName) ? altName : displayName;
 
@@ -61,6 +61,7 @@ public class VillagePortal : MonoBehaviour
     Text prompt;
     ParticleSystem swirl;
     Light glow;
+    WarpPortalFx portalFx; // [변경] 소용돌이 포탈 면 (SG_WarpPortal)
     Material barrierMat;
     bool open, wasOpen, near, wasNear, showing; // wasNear · showing
     CanvasGroup banner;
@@ -73,7 +74,7 @@ public class VillagePortal : MonoBehaviour
 
     void Start()
     {
-        // [변경] 마을에 들어올 때 한 번 자동 저장 (포탈이 여러 개여도 씬마다 한 번)
+        // 마을에 들어올 때 한 번 자동 저장 (포탈이 여러 개여도 씬마다 한 번)
         if (savedScene != gameObject.scene.handle)
         {
             savedScene = gameObject.scene.handle;
@@ -82,7 +83,9 @@ public class VillagePortal : MonoBehaviour
         health = FindAnyObjectByType<PlayerHealth>();
         if (health != null) player = health.transform;
         if (barrier != null && barrier.TryGetComponent(out Renderer r)) barrierMat = r.material; // 이 문만 색을 바꾸도록 복사본
-        BuildSwirl();
+       // BuildSwirl();
+        portalFx = WarpPortalFx.Create(transform, transform.TransformPoint(Vector3.up * 2.5f), transform.rotation, portalRadius * 0.95f,
+            new Color(color.r * 0.8f, color.g * 1.1f, color.b * 1.8f), new Color(0.02f, 0.06f, 0.2f), false, 0f); // [변경] 빛은 기존 Glow가 담당
         BuildPrompt();
         BuildBanner();
         wasOpen = !Check(unlock);
@@ -140,9 +143,14 @@ public class VillagePortal : MonoBehaviour
             else barrierMat.color = c;
         }
         if (glow != null) glow.color = open ? color : lockedColor;
-        if (swirl == null) return;
-        if (open && !swirl.isPlaying) swirl.Play();
-        else if (!open) swirl.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        if (portalFx != null) // [변경] 열리면 포탈이 펼쳐지고, 잠기면 접힘 (붉은 결계만)
+        {
+            if (open) portalFx.Open(0.7f);
+            else portalFx.Close(0.4f);
+        }
+        //if (swirl == null) return;
+        //if (open && !swirl.isPlaying) swirl.Play();
+        //else if (!open) swirl.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
     // ===== 잠긴 문 안내 =====

@@ -42,7 +42,8 @@ public class PlayerDodge : MonoBehaviour
     [SerializeField] float invulnerableEnd = 0.3f;
 
     // 저스트 회피 타이밍 (둘 중 하나만 만족해도 인정)
-    //  1) 회피를 누른 순간: 적 판정 시작 justWindow초 전 ~ 판정 시작 후 justLateWindow초 사이
+    //  1) 회피를 누른 순간 적 판정 시작 justWindow초 전 ~ 판정 시작 후 justLateWindow초 사이였고, [변경]
+    //     그 공격의 판정이 실제로 회피 무적 시간 안에 시작됨 (잡기 예고처럼 공격이 나오기 전에 미리 구른 건 제외)
     //  2) 회피 시작 후 avoidedHitWindow초 안에 무적으로 공격을 흘림
     [Header("Just Dodge")]
     [SerializeField] float justWindow = 0.2f;
@@ -89,6 +90,7 @@ public class PlayerDodge : MonoBehaviour
 
     readonly Collider[] overlapBuffer = new Collider[32];
     readonly HashSet<IAttackThreat> seen = new HashSet<IAttackThreat>();
+    readonly List<IAttackThreat> pendingThreats = new List<IAttackThreat>(); // [변경] 누른 순간 노리던 공격들 → 무적 안에 판정이 시작되면 저스트
 
     public bool IsDodging => dodging;
     public bool CanCancel => dodging && timer >= actionCancelTime;
@@ -124,7 +126,7 @@ public class PlayerDodge : MonoBehaviour
 
     void Update()
     {
-        if (GamePause.IsPaused) return; // [변경] 일시정지 중엔 입력·진행을 멈춤
+        if (GamePause.IsPaused) return; // 일시정지 중엔 입력·진행을 멈춤
         // 회피 도중 스킬이 시작되면 회피만 조용히 끝내고 제어권은 스킬에 넘김
         if (dodging && skill != null && skill.IsActive)
         {
@@ -205,7 +207,7 @@ public class PlayerDodge : MonoBehaviour
         justTriggered = false;
 
         Dodged?.Invoke(direction);
-        if (IsThreatNearby()) TriggerJustDodge(); // 회피 시작 시점에 곧 맞을 공격이 있었는지 확인
+        CollectThreats(); // [변경] 회피 시작 시점에 곧 들어올 공격을 기억만 하고, 판정이 실제로 무적 안에 시작될 때 인정
         if (logDodge) Debug.Log($"[Dodge] {(turnToDirection ? "F(회전)" : "FBLR"[clipIndex].ToString())} · 연속 {chainCount}");
     }
 
@@ -213,6 +215,7 @@ public class PlayerDodge : MonoBehaviour
     void UpdateDodge(float dt)
     {
         timer += dt;
+        CheckPendingThreats();
 
         float p = Mathf.Clamp01(timer / moveTime);
         float eased = Mathf.Lerp(p, 1f - (1f - p) * (1f - p), easeOut); // 끝 속도가 0이 되지 않게 선형과 섞음
@@ -250,21 +253,42 @@ public class PlayerDodge : MonoBehaviour
         if (dodging && timer <= avoidedHitWindow) TriggerJustDodge(); // 전용 값으로 분리
     }
 
-    // 반경 안의 적 중 justWindow초 안에 이 위치를 때릴 공격이 있는지
-    bool IsThreatNearby()
+    // [변경] 기억해 둔 공격 중 하나라도 무적 시간 안에 판정이 켜지면 저스트 회피
+    void CheckPendingThreats()
     {
+        if (justTriggered || pendingThreats.Count == 0) return;
+        if (timer > invulnerableEnd)
+        {
+            pendingThreats.Clear();
+            return;
+        }
+        foreach (IAttackThreat threat in pendingThreats)
+        {
+            if (threat as UnityEngine.Object == null) continue;
+            float until = threat.SecondsUntilHit();
+            if (until >= 0f && until <= 0.02f)
+            {
+                pendingThreats.Clear();
+                TriggerJustDodge();
+                return;
+            }
+        }
+    }
+
+    void CollectThreats()
+    {
+        pendingThreats.Clear();
         seen.Clear();
         int count = Physics.OverlapSphereNonAlloc(transform.position, threatRadius, overlapBuffer, ~0, QueryTriggerInteraction.Ignore);
         for (int i = 0; i < count; i++)
         {
             Collider col = overlapBuffer[i];
             if (col.transform.IsChildOf(transform)) continue;
-
             IAttackThreat threat = col.GetComponentInParent<IAttackThreat>();
             if (threat == null || !seen.Add(threat)) continue;
-            if (threat.IsAboutToHit(transform.position, justWindow, justLateWindow)) return true;
+            if (threat.IsAboutToHit(transform.position, justWindow, justLateWindow)) pendingThreats.Add(threat);
         }
-        return false;
+        CheckPendingThreats(); // 이미 판정 중인 공격(늦은 입력)은 바로 인정
     }
 
     // 적만 느려지고(플레이어는 그대로) 잔상이 남음

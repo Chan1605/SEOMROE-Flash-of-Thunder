@@ -52,7 +52,7 @@ public class BossDuel : MonoBehaviour
             if (kb.f5Key.wasPressedThisFrame) Begin();
             if (kb.f6Key.wasPressedThisFrame && boss != null && boss.CanBeTargeted)
             {
-                boss.DebugSetHealth01(boss.Phase2Ratio - 0.01f);
+                boss.DebugSetHealth01(0.03f); // [변경] 2페이즈는 1페이즈 체력을 다 깎으면 시작 → 거의 다 깎인 상태로
                 Show("2페이즈 직전으로", 2f);
             }
         }

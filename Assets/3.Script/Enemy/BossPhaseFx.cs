@@ -68,7 +68,7 @@ public class BossPhaseFx : MonoBehaviour
         {
             nextArc = Time.time + Random.Range(0.5f, 1.1f);
             Vector3 p = blade.position;
-            ThunderBolt3D.Strike(p, p + Random.onUnitSphere * 0.9f, 0.25f, 0);
+            ThunderBolt3D.StrikeDark(p, p + Random.onUnitSphere * 0.9f, 0.25f, 0); // [변경] 검붉은 번개
         }
     }
 

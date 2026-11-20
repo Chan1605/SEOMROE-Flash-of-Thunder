@@ -9,8 +9,8 @@ using UnityEngine.UI;
 //  가운데 허브에서 동 · 서 · 북 갈래 방(각자 ZoneArena)을 원하는 순서로 깸 → 갈래마다 스킬 포인트
 //  셋 다 깨면 허브 구역(ZoneArena, 처음엔 꺼 둠)이 깨어나 수문장(중간보스) 전투 → 이기면 남쪽 출구(본편 보스 구역 입구로)
 //  목표 안내: 오른쪽 위에 남은 목표 + 거리, 나침반 · 화면 밖 화살표에도 같은 목표 표식 (클리어한 갈래는 빠짐)
-//  [변경] 뇌문: 허브의 각 갈래 문 앞(아직 안 깬 곳) · 깬 갈래 방 가운데에 번개 문 → E로 바로 이동 (긴 통로를 오가지 않게)
-//  [변경] 날씨: 비 + 번개 · 천둥 (DungeonWeather)
+//  뇌문: 허브의 각 갈래 문 앞(아직 안 깬 곳) · 깬 갈래 방 가운데에 번개 문 → E로 바로 이동 (긴 통로를 오가지 않게)
+//  날씨: 비 + 번개 · 천둥 (DungeonWeather)
 public class DungeonDirector : MonoBehaviour
 {
     public const string ClearedFlag = "DungeonCleared";
@@ -26,9 +26,9 @@ public class DungeonDirector : MonoBehaviour
     [SerializeField] HUDNavigationElementSettings markerSettings; // 본편 구역 목표와 같은 설정 (Nav_Objective)
     [SerializeField] float refreshInterval = 0.2f;
     [SerializeField] float roomRadius = 21f; // 이 안에 들어오면 그 방에 온 것으로 봄 (벽 반지름 19 + 여유)
-    [SerializeField] float hubGateDistance = 11f;    // [변경] 허브 가운데에서 각 갈래 문 쪽으로 이만큼 → 뇌문 자리
-    [SerializeField] float branchArrive = 17.5f;     // [변경] 갈래 방 가운데에서 입구 쪽으로 이만큼 → 도착 자리 (전투 시작 범위 바로 밖)
-    [SerializeField] float hubArrive = 8f;           // [변경] 허브로 돌아올 때 그 갈래 문 쪽 이만큼
+    [SerializeField] float hubGateDistance = 11f;    // 허브 가운데에서 각 갈래 문 쪽으로 이만큼 → 뇌문 자리
+    [SerializeField] float branchArrive = 17.5f;     // 갈래 방 가운데에서 입구 쪽으로 이만큼 → 도착 자리 (전투 시작 범위 바로 밖)
+    [SerializeField] float hubArrive = 8f;           // 허브로 돌아올 때 그 갈래 문 쪽 이만큼
     [SerializeField] float gateRange = 2.4f;
 
     static readonly Color Gold = new Color(0.95f, 0.8f, 0.45f);
@@ -59,8 +59,8 @@ public class DungeonDirector : MonoBehaviour
         if (exitMarker != null) exitNav = CreateMarker("Nav_Exit", exitMarker.transform.position);
 
         BuildUi();
-        BuildGates(); // [변경]
-        gameObject.AddComponent<DungeonWeather>(); // [변경]
+        BuildGates();
+        gameObject.AddComponent<DungeonWeather>();
         UpdateObjective();
     }
 
@@ -87,11 +87,11 @@ public class DungeonDirector : MonoBehaviour
 
         if (done.Count < branches.Count)
         {
-            ShowBanner($"봉인 해제  {done.Count} / {branches.Count}   ·   스킬 포인트 +{pointsPerBranch}");
+            ShowBanner($"구역 해제  {done.Count} / {branches.Count}   ·   스킬 포인트 +{pointsPerBranch}");
             return;
         }
         if (hub != null) hub.enabled = true; // 핵심: 마지막 봉인 → 허브가 전투 구역으로 깨어남
-        ShowBanner("모든 봉인이 풀렸다 — 협곡 중앙으로");
+        ShowBanner("전지역 해제 — 협곡 중앙으로");
     }
 
     // 허브 웨이브에서 정예가 생기는 순간(Start 전) 수문장으로 만듦
@@ -134,12 +134,12 @@ public class DungeonDirector : MonoBehaviour
         }
         else if (focus != null) // 그 방의 목표만
         {
-            lines.Append($"봉인 해제  {done.Count} / {branches.Count}");
+            lines.Append($"구역 해제  {done.Count} / {branches.Count}");
             lines.Append(focus == fighting ? $"\n{focus.DisplayName}   전투 중" : $"\n{focus.DisplayName}");
         }
         else
         {
-            lines.Append($"봉인 해제  {done.Count} / {branches.Count}");
+            lines.Append($"구역 해제  {done.Count} / {branches.Count}");
             foreach (ZoneArena b in branches)
                 if (b != null && !done.Contains(b))
                     lines.Append($"\n{b.DisplayName}   {Distance(b.transform.position)}");
@@ -186,7 +186,7 @@ public class DungeonDirector : MonoBehaviour
 
     void Update()
     {
-        UpdateGates(); // [변경]
+        UpdateGates();
         refreshTimer -= Time.unscaledDeltaTime;
         if (refreshTimer <= 0f) // 거리 · 전투 중 표시 갱신
         {
@@ -218,7 +218,7 @@ public class DungeonDirector : MonoBehaviour
         bannerGroup = banner.gameObject.AddComponent<CanvasGroup>();
         bannerGroup.alpha = 0f;
 
-        // [변경] 뇌문 안내 (화면 아래 가운데) · 이동할 때 번쩍이는 막
+        // 뇌문 안내 (화면 아래 가운데) · 이동할 때 번쩍이는 막
         prompt = UIKit.Text(canvas.transform, "", font, 28, Color.white, TextAnchor.MiddleCenter);
         RectTransform p = prompt.rectTransform;
         p.anchorMin = p.anchorMax = new Vector2(0.5f, 0f);
@@ -230,7 +230,7 @@ public class DungeonDirector : MonoBehaviour
         UIKit.Stretch(warpFlash.rectTransform);
     }
 
-    // ===== [변경] 뇌문 (갈래 방 ↔ 허브 바로 이동) =====
+    // ===== 뇌문 (갈래 방 ↔ 허브 바로 이동) =====
     class Gate
     {
         public ZoneArena branch;
@@ -359,6 +359,7 @@ public class DungeonDirector : MonoBehaviour
         root.transform.position = position;
         var mat = new Material(Shader.Find("Sprites/Default"));
 
+        /* [변경] 포탈 면이 생겨 바닥 고리는 끔
         var ring = new GameObject("Ring").AddComponent<LineRenderer>();
         ring.transform.SetParent(root.transform, false);
         ring.sharedMaterial = mat;
@@ -373,27 +374,28 @@ public class DungeonDirector : MonoBehaviour
             float a = i * Mathf.PI * 2f / Segments;
             ring.SetPosition(i, new Vector3(Mathf.Cos(a) * 1.4f, 0.08f, Mathf.Sin(a) * 1.4f));
         }
+        */
 
-        var ps = new GameObject("Sparks").AddComponent<ParticleSystem>();
-        ps.transform.SetParent(root.transform, false);
-        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        ParticleSystem.MainModule main = ps.main;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.6f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 3f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
-        main.startColor = new Color(0.7f, 0.88f, 1f);
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
-        ParticleSystem.ShapeModule shape = ps.shape;
-        shape.shapeType = ParticleSystemShapeType.Circle;
-        shape.radius = 1.3f;
-        shape.rotation = new Vector3(-90f, 0f, 0f); // 위로 뿜음
-        ParticleSystem.EmissionModule em = ps.emission;
-        em.rateOverTime = 30f;
-        var pr = ps.GetComponent<ParticleSystemRenderer>();
-        pr.sharedMaterial = mat;
-        pr.renderMode = ParticleSystemRenderMode.Stretch;
-        pr.velocityScale = 0.06f;
-        ps.Play();
+        //var ps = new GameObject("Sparks").AddComponent<ParticleSystem>();
+        //ps.transform.SetParent(root.transform, false);
+        //ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        //ParticleSystem.MainModule main = ps.main;
+        //main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.6f);
+        //main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 3f);
+        //main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
+        //main.startColor = new Color(0.7f, 0.88f, 1f);
+        //main.simulationSpace = ParticleSystemSimulationSpace.World;
+        //ParticleSystem.ShapeModule shape = ps.shape;
+        //shape.shapeType = ParticleSystemShapeType.Circle;
+        //shape.radius = 1.3f;
+        //shape.rotation = new Vector3(-90f, 0f, 0f); // 위로 뿜음
+        //ParticleSystem.EmissionModule em = ps.emission;
+        //em.rateOverTime = 30f;
+        //var pr = ps.GetComponent<ParticleSystemRenderer>();
+        //pr.sharedMaterial = mat;
+        //pr.renderMode = ParticleSystemRenderMode.Stretch;
+        //pr.velocityScale = 0.06f;
+        //ps.Play();
 
         var glow = new GameObject("Glow").AddComponent<Light>();
         glow.transform.SetParent(root.transform, false);
@@ -402,6 +404,11 @@ public class DungeonDirector : MonoBehaviour
         glow.color = new Color(0.55f, 0.75f, 1f);
         glow.range = 6f;
         glow.intensity = 2.5f;
+
+        // 고리 위에 서 있는 소용돌이 포탈 면 (카메라 쪽을 봄)
+        WarpPortalFx portal = WarpPortalFx.Create(root.transform, position + Vector3.up * 1.6f, Quaternion.identity, 1.25f,
+            new Color(0.5f, 0.8f, 1.8f), new Color(0.03f, 0.05f, 0.2f), true, 0f);
+        portal.SetOpenInstant(true);
         return root;
     }
 }
