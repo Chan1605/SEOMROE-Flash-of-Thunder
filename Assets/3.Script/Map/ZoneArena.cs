@@ -122,7 +122,7 @@ public class ZoneArena : MonoBehaviour
         {
             int n = 0;
             foreach (EnemySwordsman e in current)
-                if (e != null && e.IsAlive) n++; // [변경] 숨은 보스를 쓰러진 것으로 세지 않게
+                if (e != null && e.IsAlive) n++; // 숨은 보스를 쓰러진 것으로 세지 않게
             return n;
         }
     }
@@ -229,9 +229,42 @@ public class ZoneArena : MonoBehaviour
     // 보스 웨이브는 그대로, 나머지는 배율 + 추가
     int ScaledCount(Wave wave)
     {
+        if (mergedWaves) return wave.count; // [변경] 합칠 때 웨이브마다 이미 배율 적용
         var enemy = wave.enemyPrefab.GetComponent<EnemySwordsman>();
         if (enemy != null && enemy.IsBoss) return wave.count;
         return Mathf.Max(1, Mathf.RoundToInt(wave.count * countScale) + extraPerWave);
+    }
+
+    // [변경] 웨이브를 기다리지 않고 한 번에: 모든 웨이브의 적을 한 무리로 합침 (웨이브마다 배율 · 추가 인원을 먼저 적용해 총원 유지)
+    //  정예 · 추가 적 종류가 다르면 추가 적 칸으로 넣음. 시련(무한)과 웨이브 1개짜리는 그대로
+    bool mergedWaves;
+
+    public void SpawnAllAtOnce()
+    {
+        if (mergedWaves || endless || waves.Count <= 1) return;
+        var merged = new Wave { enemyPrefab = null, count = 0, extras = new List<Group>() };
+        foreach (Wave w in waves)
+        {
+            if (w == null || w.enemyPrefab == null) continue;
+            int scaled = ScaledCount(w);
+            if (merged.enemyPrefab == null) merged.enemyPrefab = w.enemyPrefab;
+            if (w.enemyPrefab == merged.enemyPrefab) merged.count += scaled;
+            else merged.extras.Add(new Group { prefab = w.enemyPrefab, count = scaled });
+
+            if (w.elitePrefab != null && w.eliteCount > 0)
+            {
+                if (merged.elitePrefab == null) merged.elitePrefab = w.elitePrefab;
+                if (w.elitePrefab == merged.elitePrefab) merged.eliteCount += w.eliteCount;
+                else merged.extras.Add(new Group { prefab = w.elitePrefab, count = w.eliteCount });
+            }
+            foreach (Group g in w.extras)
+                if (g != null && g.prefab != null) merged.extras.Add(new Group { prefab = g.prefab, count = g.count });
+        }
+        if (merged.enemyPrefab == null) return;
+        waves.Clear();
+        waves.Add(merged);
+        mergedWaves = true;
+        if (logState) Debug.Log($"[Zone] {name} 웨이브 합침 · 기본 {merged.count} · 정예 {merged.eliteCount} · 추가 {merged.extras.Count}");
     }
 
     void SpawnWave(Wave wave)
@@ -323,7 +356,7 @@ public class ZoneArena : MonoBehaviour
     bool AllDefeated()
     {
         foreach (EnemySwordsman e in current)
-            if (e != null && e.IsAlive) return false; // [변경] CanBeTargeted는 등장 전 보스를 false로 봐서 구역이 바로 클리어되고 사망 부활이 막혔음
+            if (e != null && e.IsAlive) return false; // CanBeTargeted는 등장 전 보스를 false로 봐서 구역이 바로 클리어되고 사망 부활이 막혔음
         return true;
     }
 

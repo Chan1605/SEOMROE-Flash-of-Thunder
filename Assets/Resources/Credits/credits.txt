@@ -1,0 +1,42 @@
+! SEOMROE: Flash of Thunder
+~ 섬  뢰
+
+- 흑뢰를 쓰러뜨렸다
+
+# 개발
+Jongchan
+- 기획 · 프로그래밍 · 연출
+
+# 캐릭터 · 애니메이션
+Samurai Character — MoonCat
+Sword Animation Pack
+
+# 환경
+Forest Environment - Dynamic Nature — NatureManufacture
+Toon Fantasy Nature
+
+# 이펙트
+Master Stylized Projectiles
+Procedural Lightning — Digital Ruby
+
+# UI
+HUD Navigation System — Sickscore Games
+DOTween — Demigiant
+
+# 글꼴
+Pretendard
+Cinzel
+Song Myung
+
+# 사운드
+- Pixabay
+freesound_gamestudio · dragon-studio
+cyberwave-orchestra · creatorshome
+
+# 음악
+- (추가 예정)
+
+# 엔진
+Unity 6 · Universal Render Pipeline
+
+@ Thank you for playing

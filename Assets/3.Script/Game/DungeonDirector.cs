@@ -30,6 +30,7 @@ public class DungeonDirector : MonoBehaviour
     [SerializeField] float branchArrive = 17.5f;     // 갈래 방 가운데에서 입구 쪽으로 이만큼 → 도착 자리 (전투 시작 범위 바로 밖)
     [SerializeField] float hubArrive = 8f;           // 허브로 돌아올 때 그 갈래 문 쪽 이만큼
     [SerializeField] float gateRange = 2.4f;
+    [SerializeField] string[] spawnAllRooms = { "Dungeon_North" }; // [변경] 웨이브 대신 한 번에 전부 나오는 갈래 (오브젝트 이름)
 
     static readonly Color Gold = new Color(0.95f, 0.8f, 0.45f);
 
@@ -48,6 +49,8 @@ public class DungeonDirector : MonoBehaviour
         if (exitMarker != null) exitMarker.SetActive(false);
         foreach (ZoneArena b in branches)
             if (b != null) b.Cleared += () => OnBranchCleared(b);
+        foreach (ZoneArena b in branches) // [변경] 북쪽 버티기 → 한 번에 전부
+            if (b != null && System.Array.IndexOf(spawnAllRooms, b.name) >= 0) b.SpawnAllAtOnce();
         if (hub != null) hub.Cleared += OnHubCleared;
         ZoneArena.AnyEnemyCreated += OnEnemyCreated;
 
@@ -359,7 +362,7 @@ public class DungeonDirector : MonoBehaviour
         root.transform.position = position;
         var mat = new Material(Shader.Find("Sprites/Default"));
 
-        /* [변경] 포탈 면이 생겨 바닥 고리는 끔
+        /* 포탈 면이 생겨 바닥 고리는 끔
         var ring = new GameObject("Ring").AddComponent<LineRenderer>();
         ring.transform.SetParent(root.transform, false);
         ring.sharedMaterial = mat;

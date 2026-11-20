@@ -30,11 +30,16 @@ public class LoadingScreen : MonoBehaviour
         { "Q를 길게 누르면 발도 자세. 조준점을 올려 둔 적을 표식 순서대로 벱니다.", "StanceMarks" },
         { "콤보 중 적이 공격하면 우클릭 역뢰로 맞받아칠 수 있습니다.", "KanpaSmash" }, // 용어 교체
         { "패링으로 무너진 적에게 다가가 F를 누르면 처형합니다. 처형은 뇌기를 크게 채웁니다.", "HudBolt" },
-        { "뇌기 2칸으로 R: 뇌신 강림. 휘두를 때마다 검기가 날아가고 맞힌 적 주변으로 번개가 튑니다.", "Enchant" }, // [변경]
-        { "강림 중 Q는 강림 시간을 떼어 발도 시간을 엽니다. 그동안 표식 수 제한이 없습니다.", "EnchantDraw" }, // [변경]
+        { "뇌기 2칸으로 R: 뇌신 강림. 휘두를 때마다 검기가 날아가고 맞힌 적 주변으로 번개가 튑니다.", "Enchant" },
+        { "강림 중 Q는 강림 시간을 떼어 발도 시간을 엽니다. 그동안 표식 수 제한이 없습니다.", "EnchantDraw" },
         { "화톳불에서 쉬면 체력이 회복되고 스킬트리를 열 수 있습니다.", "HudHeart" },
         { "보스는 섬뢰일도에 즉사하지 않습니다. 체간을 무너뜨린 뒤에 노리세요.", "ThunderFlash" }, // 용어 교체
         { "패링 · 역뢰 · 완벽 회피 · 처형으로 궁극기 게이지가 찹니다. V를 짧게 누르면 낙뢰진, 누르고 있으면 천뢰일섬 → 뇌신강림.", "ThunderFlash" }, // 용어 교체
+        // [변경] 새 규칙 안내
+        { "싸우는 중 우클릭을 누르고 버티면 뇌기가 모입니다. 맞으면 끊깁니다.", "HudBolt" },
+        { "칼날이 파랗게 빛나는 첫 타는 패링 타이밍을 알려 줍니다. 연타는 첫 타의 리듬으로 이어서 막으세요.", "KanpaSmash" },
+        { "붉게 번쩍이는 위험 공격은 패링 · 역뢰가 통하지 않습니다. 회피로 피하세요.", "DodgeDraw" },
+        { "보스의 검기도 닿기 직전 우클릭으로 패링하면 보스에게 되받아칩니다. 땅을 가르는 검기는 패링할 수 없습니다.", "KanpaSmash" },
     };
 
     Text placeText, placeSub, tipText, percentText;
@@ -53,6 +58,11 @@ public class LoadingScreen : MonoBehaviour
         {
             place = "흑뢰의 제단";
             sub = "협곡을 지나 마지막 제단으로";
+        }
+        if (sceneName == "InGame" && !string.IsNullOrEmpty(RunState.SpawnAt) && RunState.SpawnAt.Contains("Trial")) // [변경] 클리어 후 마을 → 시련의 터
+        {
+            place = "시련의 터";
+            sub = "끝없이 밀려오는 적을 얼마나 버틸 수 있는가";
         }
         placeText.text = place;
         placeSub.text = sub;

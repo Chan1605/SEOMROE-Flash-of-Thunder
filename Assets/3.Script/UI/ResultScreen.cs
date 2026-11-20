@@ -1,11 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // 보스 처치 결과 화면 (RunRecord.Finished). 게임을 멈추고 기록을 한 줄씩 띄운 뒤 랭크를 찍음
 // 타이틀과 같은 모양: VICTORY(세리프) + ◆── 장식선 + "토벌 완료", 줄마다 마름모, 랭크 뒤 붓질
-//  - CONTINUE: 닫고 이어서 (시련의 터) · MAIN MENU: 타이틀로 (Title 씬이 빌드에 있을 때만)
+//  - CONTINUE: 첫 토벌이면 엔딩 크레딧 → 마을로 자동 귀환 (이미 봤으면 바로 마을). 마을이 없으면 예전처럼 닫고 이어서
+//  - MAIN MENU: 타이틀로 (Title 씬이 빌드에 있을 때만)
 public class ResultScreen : MonoBehaviour
 {
     static readonly Color Gold = UIKit.Gold;
@@ -30,7 +32,9 @@ public class ResultScreen : MonoBehaviour
 
     void OnDestroy()
     {
+        if (IsShowing) Time.timeScale = 1f; // [변경] 결과 화면이 떠 있던 채로 사라져도 시간을 멈춘 채 두지 않음
         IsShowing = false;
+        SceneManager.activeSceneChanged -= OnLeftScene;
         if (record != null) record.Finished -= Show;
     }
 
@@ -130,14 +134,11 @@ public class ResultScreen : MonoBehaviour
         UIKit.Place(bottom.rectTransform, x, 860f, 900f, 1f);
         AddButton(buttons.transform, "CONTINUE", x, Continue);
         float next = x + 300f;
-        if (Application.CanStreamedLevelBeLoaded(VillagePortal.VillageScene)) // [변경] 마을로 돌아가기 (진행 상태 이어받음)
-        {
-            AddButton(buttons.transform, "VILLAGE", next, () => SceneTransition.Load(VillagePortal.VillageScene, true, VillagePortal.ReturnPoint));
-            next += 300f;
-        }
         if (Application.CanStreamedLevelBeLoaded(TitleScreen.SceneName))
             AddButton(buttons.transform, "MAIN MENU", next, () => SceneTransition.Load(TitleScreen.SceneName, false));
-        Text hint = UIKit.Text(buttons.transform, "CONTINUE: 계속 탐험 · 시련의 터 도전", bodyFont, 20, new Color(1f, 1f, 1f, 0.4f), TextAnchor.MiddleLeft);
+        string hintText = !HasVillage ? "CONTINUE: 계속 탐험 · 시련의 터 도전"
+            : EndingCredits.Seen ? "CONTINUE: 마을로 돌아감 · 산문 포탈에서 시련의 터 도전" : "CONTINUE: 엔딩 → 마을로 돌아감";
+        Text hint = UIKit.Text(buttons.transform, hintText, bodyFont, 20, new Color(1f, 1f, 1f, 0.4f), TextAnchor.MiddleLeft);
         UIKit.Place(hint.rectTransform, x, 960f, 800f, 30f);
     }
 
@@ -224,7 +225,40 @@ public class ResultScreen : MonoBehaviour
         step(1f);
     }
 
+    static bool HasVillage => Application.CanStreamedLevelBeLoaded(VillagePortal.VillageScene);
+
+    // 마을이 있으면: (첫 토벌) 엔딩 크레딧 → 마을 / (이미 봄) 바로 마을. 진행 상태는 이어받음
     void Continue()
+    {
+        if (HasVillage)
+        {
+            buttonGroup.interactable = false;
+            if (EndingCredits.Seen) GoVillage();
+            else EndingCredits.Play(titleFont, bodyFont, GoVillage);
+            return;
+        }
+        Close();
+    }
+
+    // [변경] 이 화면은 씬을 넘어 유지되는 RunRecord에 붙어 있음 → 씬이 바뀌는 순간(검은 화면 뒤) 결과 UI를 지우고 멈춤을 풂
+    //  (그대로 두면 로딩 화면 위에 기록이 보이고, LateUpdate가 timeScale 0을 계속 넣어 마을에서 못 움직였음)
+    void GoVillage()
+    {
+        SceneManager.activeSceneChanged -= OnLeftScene;
+        SceneManager.activeSceneChanged += OnLeftScene;
+        SceneTransition.Load(VillagePortal.VillageScene, true, VillagePortal.ReturnPoint);
+    }
+
+    void OnLeftScene(Scene from, Scene to)
+    {
+        SceneManager.activeSceneChanged -= OnLeftScene;
+        if (root != null) Destroy(root);
+        IsShowing = false;
+        Time.timeScale = 1f;
+        if (GamePause.IsPaused) GamePause.Set(false);
+    }
+
+    void Close()
     {
         Destroy(root);
         IsShowing = false;

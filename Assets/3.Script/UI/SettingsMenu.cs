@@ -29,10 +29,11 @@ public class SettingsMenu : MonoBehaviour
     public Font DisplayFont => Display; // 스킬트리 · 결과 화면이 같은 세리프를 빌려 씀
     public event Action Closed; // 타이틀 화면에서 돌아갈 때 사용
 
-    enum Page { Root, Display, Gameplay, Graphics, Audio, Quit }
+    enum Page { Root, Display, Gameplay, Graphics, Audio, Developer, Quit } // 개발자 옵션 (게임 안에서만)
 
-    static readonly string[] CategoryNames = { "DISPLAY", "GAMEPLAY", "GRAPHICS", "AUDIO" };
-    static readonly string[] CategoryCaptions = { "화면", "조작", "그래픽", "소리" };
+    static readonly string[] CategoryNames = { "DISPLAY", "GAMEPLAY", "GRAPHICS", "AUDIO", "DEVELOPER" };
+    static readonly string[] CategoryCaptions = { "화면", "조작", "그래픽", "소리", "개발자" };
+    int CategoryCount => inGame ? CategoryNames.Length : CategoryNames.Length - 1; // 테스트 안 할 경우에는 주석처리 
 
     GameObject root;
     CanvasGroup rootGroup;
@@ -185,6 +186,7 @@ public class SettingsMenu : MonoBehaviour
             case Page.Gameplay: BuildGameplay(); break;
             case Page.Graphics: BuildGraphics(); break;
             case Page.Audio: BuildAudio(); break;
+            case Page.Developer: BuildDeveloper(); break; // [변경]
             case Page.Quit: BuildQuit(); break;
         }
         RefreshAll();
@@ -231,6 +233,15 @@ public class SettingsMenu : MonoBehaviour
         AddSlider(row++, "Effects Volume", 0f, 1f, () => AudioOptions.Sfx, v => AudioOptions.Sfx = v, null);
     }
 
+    // [변경] 시연용: 무적 · 레벨업 · 게이지 채우기 (DevCheats, 저장 안 함)
+    void BuildDeveloper()
+    {
+        int row = 0;
+        AddToggle(row++, "God Mode", () => DevCheats.GodMode, v => DevCheats.GodMode = v);
+        AddSelector(row++, "Level Up", () => DevCheats.Stats != null ? $"Lv {DevCheats.Stats.Level}" : "-", d => { if (d > 0) DevCheats.LevelUp(); });
+        AddSelector(row++, "Fill Gauges", () => "뇌기 · 궁극기", d => DevCheats.FillGauges());
+    }
+
     void BuildQuit()
     {
         // 타이틀 로고 묶음처럼: 세리프 큰 글씨 + 금빛 장식선 + 한글 캡션
@@ -243,7 +254,7 @@ public class SettingsMenu : MonoBehaviour
         float y = 590f;
         // 게임 중이고 타이틀 씬이 빌드에 있으면 타이틀로 돌아가기 (진행 상태는 버림)
         // 본편 · 던전 · 수련장에서 마을로 (진행 상태는 이어받음)
-        // [변경] 연습장은 마을 포탈로 왔을 때만, 떠나기 전 저장본 그대로 돌아감 (전부 해금을 본편에 가져오지 않게). 타이틀에서 온 연습장은 숨김
+        // 연습장은 마을 포탈로 왔을 때만, 떠나기 전 저장본 그대로 돌아감 (전부 해금을 본편에 가져오지 않게). 타이틀에서 온 연습장은 숨김
         string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
         bool training = scene == "Training";
         bool fromHub = scene == "Tutorial" || training;
@@ -478,7 +489,7 @@ public class SettingsMenu : MonoBehaviour
         categoryDiamond.raycastTarget = false;
         categoryDiamond.rectTransform.sizeDelta = new Vector2(10f, 10f);
         categoryDiamond.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
-        for (int i = 0; i < CategoryNames.Length; i++)
+        for (int i = 0; i < CategoryCount; i++) // [변경]
         {
             int index = i;
             Text t = AddTextButton((RectTransform)menuGo.transform, CategoryNames[i], 32, 170f, CategoryY(i), 260f, () => ShowPage((Page)(index + 1)));
@@ -489,7 +500,7 @@ public class SettingsMenu : MonoBehaviour
         }
         if (inGame)
         {
-            float y = CategoryY(4) + 20f;
+            float y = CategoryY(CategoryCount) + 20f; // [변경] 분류 수에 맞춰 아래로
             AddTextButton((RectTransform)menuGo.transform, "QUIT GAME", 22, 170f, y, 300f, () => ShowPage(Page.Quit));
             skipTutorialText = AddTextButton((RectTransform)menuGo.transform, "SKIP TUTORIAL", 22, 170f, y + 48f, 300f, SkipTutorial);
         }

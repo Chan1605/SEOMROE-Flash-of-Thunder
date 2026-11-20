@@ -138,6 +138,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return HitResult.Ignored;
         }
         if (dodge != null && dodge.IsDodging) dodge.Interrupt();
+        if (DevCheats.GodMode) return HitResult.Ignored; // [변경] 개발자 무적 (패링 · 역뢰 · 회피 판정 뒤라 그 연출은 그대로)
 
         TakeDamage(info.Damage); // 가드 깎임 피해와 공용
 
@@ -169,7 +170,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         }
         bool invulnerable = invulnerableTimer > 0f || (skill != null && skill.IsActive) || (execution != null && execution.IsActive)
             || (charge != null && charge.IsDashing) || (parry != null && parry.IsInvulnerable) || (kanpa != null && kanpa.IsInvulnerable);
-        if (invulnerable) return false;
+        if (invulnerable || DevCheats.GodMode) return false; // [변경] 무적이면 잡기도 헛잡음
 
         grabbed = true;
         stunTimer = 0f;
@@ -331,7 +332,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public void AddMaxHealth(float amount)
     {
         maxHealth += amount;
-        if (!dead) health = Mathf.Clamp(health + amount, 1f, maxHealth); // [변경] 스킬 초기화로 줄어들 때 죽지 않게
+        if (!dead) health = Mathf.Clamp(health + amount, 1f, maxHealth); // 스킬 초기화로 줄어들 때 죽지 않게
     }
 
     // 화톳불 휴식: 살아 있으면 체력을 가득

@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 //  콤보 중 누르면      → △를 바로 예약, △ 초반에 적 공격이 닿으면 간파 (PlayerKanpa)
 //  짧게 눌렀다 떼면       → 강공격 △ (콤보 분기: □□△, □□□△ …)
 //  길게 누르고 있으면     → 차지 자세, 단계(1~3)가 오름
-//  [변경] gatherMode(기본): 차지 자세 = 뇌기 집중. 전투 중(구역 전투 · 가까운 적)에만 초당 gatherRate칸씩 뇌기가 참
+//  gatherMode(기본): 차지 자세 = 뇌기 집중. 전투 중(구역 전투 · 가까운 적)에만 초당 gatherRate칸씩 뇌기가 참
 //         피격 · 회피 · 스킬로 끊기고, 떼면 그냥 자세를 풂 (섬격 없음). '뇌기 집중' 해금 시 gatherBoost배
 //  gatherMode를 끄면 예전: dashFromLevel 단계 이상에서 떼면 섬격(閃擊), 그 전에 떼면 취소
 public class PlayerChargeAttack : MonoBehaviour
@@ -45,7 +45,7 @@ public class PlayerChargeAttack : MonoBehaviour
     [SerializeField] float turnSpeed = 360f;
     [SerializeField] bool logCharge = true;
 
-    [Header("Gather (뇌기 집중)")] // [변경]
+    [Header("Gather (뇌기 집중)")]
     [SerializeField] bool gatherMode = true;
     [SerializeField] PlayerThunder thunder;
     [SerializeField] float gatherRate = 0.5f;   // 초당 뇌기 칸
@@ -82,7 +82,7 @@ public class PlayerChargeAttack : MonoBehaviour
     bool dashSheathing; // 돌진하면서 바로 납도 모션을 틀었는지
     float hitStopUntil = -1f;
     float savedTimeScale = 1f;
-    bool hitWhileCharging; // [변경] 경직 없는 피격도 집중을 끊음
+    bool hitWhileCharging; // 경직 없는 피격도 집중을 끊음
     float combatCheckAt;
     bool inCombat;
     CharacterController controller;
@@ -97,7 +97,7 @@ public class PlayerChargeAttack : MonoBehaviour
     public int MaxLevel => levelTimes.Length;
     // HUD용 0~1 (마지막 단계 도달 시 1)
     public float ChargeRatio => !charging ? 0f : gatherMode ? GatherRatio : Mathf.Clamp01(chargeTime / Mathf.Max(0.01f, levelTimes[levelTimes.Length - 1]));
-    // [변경] 뇌기 집중: HUD 게이지 = 지금 차고 있는 뇌기 한 칸의 진행도, 문구 = 상태
+    // 뇌기 집중: HUD 게이지 = 지금 차고 있는 뇌기 한 칸의 진행도, 문구 = 상태
     public bool GatherMode => gatherMode;
     public bool Gathering => charging && gatherMode && inCombat && thunder != null && thunder.Gauge < thunder.MaxGauge - 0.001f;
     public string GatherStatus => thunder != null && thunder.Gauge >= thunder.MaxGauge - 0.001f ? "뇌기 MAX" : inCombat ? "뇌기 집중" : "상대 없음";
@@ -108,6 +108,7 @@ public class PlayerChargeAttack : MonoBehaviour
     public event Action ChargeEnded;
     public event Action<Vector3, Vector3> Dashed; // 섬격 시작·끝 (번개 궤적)
     public event Action<Vector3> TargetCut;       // 풀차지 섬격에 베인 적 위치 (낙뢰)
+    public event Action<float> Gathered;          // [변경] 뇌기 집중으로 이번 프레임에 모은 양 (수련장 단계 판정)
 
     void Awake()
     {
@@ -124,7 +125,7 @@ public class PlayerChargeAttack : MonoBehaviour
         if (stats == null) stats = GetComponent<PlayerStats>();
         if (afterimage == null) afterimage = GetComponent<PlayerAfterimage>();
         if (stance == null) stance = GetComponent<PlayerStance>();
-        if (thunder == null) thunder = GetComponent<PlayerThunder>(); // [변경]
+        if (thunder == null) thunder = GetComponent<PlayerThunder>();
         if (dashTrail == null && skill != null) dashTrail = skill.DashTrail;
         controller = GetComponent<CharacterController>();
     }
@@ -135,7 +136,7 @@ public class PlayerChargeAttack : MonoBehaviour
         heavyAction.action.Enable();
         heavyAction.action.performed += OnPressed;
         heavyAction.action.canceled += OnReleased;
-        if (health != null) health.Damaged += OnDamaged; // [변경]
+        if (health != null) health.Damaged += OnDamaged;
     }
 
     void OnDisable()
@@ -145,7 +146,7 @@ public class PlayerChargeAttack : MonoBehaviour
             heavyAction.action.performed -= OnPressed;
             heavyAction.action.canceled -= OnReleased;
         }
-        if (health != null) health.Damaged -= OnDamaged; // [변경]
+        if (health != null) health.Damaged -= OnDamaged;
         if (charging) EndCharge(true);
         if (IsDashing) EndDash(true);
         pressed = false;
@@ -215,7 +216,7 @@ public class PlayerChargeAttack : MonoBehaviour
             consumed = true; // 손을 떼도 강공격이 나가지 않게
             return;
         }
-        if (hitWhileCharging) // [변경] 경직 없이 맞아도 집중이 깨짐 (경직이면 위에서 처리)
+        if (hitWhileCharging) // 경직 없이 맞아도 집중이 깨짐 (경직이면 위에서 처리)
         {
             EndCharge(true);
             consumed = true;
@@ -230,10 +231,10 @@ public class PlayerChargeAttack : MonoBehaviour
         if (next != level) SetLevel(next);
 
         FaceInput(dt);
-        if (gatherMode) Gather(dt); // [변경]
+        if (gatherMode) Gather(dt);
     }
 
-    // ===== [변경] 뇌기 집중 =====
+    // ===== 뇌기 집중 =====
     // 핵심: 전투 중에만 차오름 → 전투 전에 미리 채워 두는 플레이 방지. 0.25초마다 주변 적을 확인
     void Gather(float dt)
     {
@@ -244,7 +245,9 @@ public class PlayerChargeAttack : MonoBehaviour
         }
         if (!inCombat || thunder == null) return;
         float rate = gatherRate * (SkillTree.IsUnlocked(SkillId.ChargeLevel3) ? gatherBoost : 1f);
+        float before = thunder.Gauge;
         thunder.Add(rate * dt);
+        if (thunder.Gauge > before) Gathered?.Invoke(thunder.Gauge - before); // [변경]
     }
 
     bool InCombat()
@@ -295,7 +298,7 @@ public class PlayerChargeAttack : MonoBehaviour
         charging = true;
         chargeTime = 0f;
         level = 0;
-        hitWhileCharging = false; // [변경]
+        hitWhileCharging = false;
         combatCheckAt = 0f;
         animator.CrossFadeInFixedTime(ChargeStartHash, 0.1f, 0, 0f);
         ChargeStarted?.Invoke();
@@ -313,7 +316,7 @@ public class PlayerChargeAttack : MonoBehaviour
     // 차지 강타 삭제: dashFromLevel 전에 떼면 취소, 이후면 섬격
     void Release()
     {
-        if (gatherMode) // [변경] 집중은 떼면 자세만 풂
+        if (gatherMode) // 집중은 떼면 자세만 풂
         {
             EndCharge(true);
             return;

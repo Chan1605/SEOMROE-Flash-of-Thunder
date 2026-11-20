@@ -20,6 +20,7 @@ public enum TutorialGoal
     ShrineRest,     // 화톳불에서 스킬트리 열기
     UnlockSkill,
     Ultimate,       // 궁극기 한 번 쓰기 (연출이 끝나면 완료). 값이 밀리지 않게 맨 뒤에 둠
+    Gather,         // [변경] 우클릭 홀드 뇌기 집중으로 뇌기 n칸 모으기
 }
 
 // 한 구역 수련장 진행기 (Tools/Setup/Tutorial Scene이 배치)
@@ -74,7 +75,9 @@ public class TutorialDirector : MonoBehaviour
     PlayerExecution execution;
     PlayerThunder thunder;
     PlayerUltimate ultimate;
+    PlayerChargeAttack heavyCharge; // [변경] 뇌기 집중
     TutorialGuide guide;
+    float gathered;
 
     int index = -1;
     int progress;
@@ -102,6 +105,7 @@ public class TutorialDirector : MonoBehaviour
         execution = FindAnyObjectByType<PlayerExecution>();
         thunder = FindAnyObjectByType<PlayerThunder>();
         ultimate = FindAnyObjectByType<PlayerUltimate>();
+        heavyCharge = FindAnyObjectByType<PlayerChargeAttack>(); // [변경]
         PlayerHealth health = FindAnyObjectByType<PlayerHealth>();
         if (health != null) player = health.transform;
 
@@ -114,6 +118,7 @@ public class TutorialDirector : MonoBehaviour
         if (lockOn != null) lockOn.TargetChanged += OnLockOn;
         if (execution != null) execution.Executed += OnExecuted;
         if (ultimate != null) ultimate.Finished += OnUltimateFinished;
+        if (heavyCharge != null) heavyCharge.Gathered += OnGathered; // [변경]
         SkillTree.Changed += OnSkillTreeChanged;
         AddMissingLessons();
 
@@ -135,14 +140,30 @@ public class TutorialDirector : MonoBehaviour
         if (lockOn != null) lockOn.TargetChanged -= OnLockOn;
         if (execution != null) execution.Executed -= OnExecuted;
         if (ultimate != null) ultimate.Finished -= OnUltimateFinished;
+        if (heavyCharge != null) heavyCharge.Gathered -= OnGathered; // [변경]
         SkillTree.Changed -= OnSkillTreeChanged;
     }
 
-    // 이미 씬에 저장된 단계 목록엔 새 기본 단계가 없음 → 빠진 목표만 기본값에서 찾아 맨 뒤에 붙임 (인스펙터에서 고친 단계는 그대로)
+    // [변경] 수련장에서 뺀 단계 (씬에 저장돼 있어도 지움). 처형은 본편에서 자연스럽게 배우도록 제외
+    static readonly TutorialGoal[] Removed = { TutorialGoal.Execute };
+
+    // 이미 씬에 저장된 단계 목록엔 새 기본 단계가 없음 → 빠진 목표를 기본 순서상 바로 앞 단계 뒤에 끼움 (인스펙터에서 고친 단계는 그대로)
     void AddMissingLessons()
     {
-        foreach (Lesson lesson in DefaultLessons())
-            if (!lessons.Exists(l => l.goal == lesson.goal)) lessons.Add(lesson);
+        lessons.RemoveAll(l => Array.IndexOf(Removed, l.goal) >= 0); // [변경]
+        List<Lesson> defaults = DefaultLessons();
+        for (int i = 0; i < defaults.Count; i++)
+        {
+            Lesson lesson = defaults[i];
+            if (lessons.Exists(l => l.goal == lesson.goal)) continue;
+            int at = lessons.Count; // [변경] 맨 뒤 대신 기본 순서 자리에
+            for (int j = i - 1; j >= 0; j--)
+            {
+                int found = lessons.FindIndex(l => l.goal == defaults[j].goal);
+                if (found >= 0) { at = found + 1; break; }
+            }
+            lessons.Insert(at, lesson);
+        }
         RenameTerms();
     }
 
@@ -164,13 +185,13 @@ public class TutorialDirector : MonoBehaviour
             l.title = Rename(l.title);
             l.description = Rename(l.description);
             l.keys = Rename(l.keys);
-            if (l.goal == TutorialGoal.EnchantStrike && l.title == "뇌검 각성") // [변경] R이 뇌신 강림으로 바뀜 (씬에 저장된 예전 문구도 교체)
+            if (l.goal == TutorialGoal.EnchantStrike && l.title == "뇌검 각성") // R이 뇌신 강림으로 바뀜 (씬에 저장된 예전 문구도 교체)
             {
                 l.title = "뇌신 강림";
                 l.description = "뇌기 2칸으로 R. 6초 동안 빨라지고 휘두를 때마다 검기가 날아가며, 맞힌 적 주변으로 번개가 튑니다.";
             }
         }
-        for (int i = 0; i < chapters.Length; i++) if (chapters[i] == "각성") chapters[i] = "강림"; // [변경]
+        for (int i = 0; i < chapters.Length; i++) if (chapters[i] == "각성") chapters[i] = "강림";
     }
 
     void Update()
@@ -217,6 +238,7 @@ public class TutorialDirector : MonoBehaviour
         stepTimer = 0f;
         lightStreak = 0;
         stanceCuts = 0;
+        gathered = 0f;
 
         Lesson step = Current;
         if (step == null)
@@ -234,6 +256,7 @@ public class TutorialDirector : MonoBehaviour
         int total = lessons.FindAll(s => s.chapter == step.chapter).Count;
         guide.ShowStep(ChapterLabel(step.chapter), index - first + 1, total, step.title, step.description, step.keys, step.count);
 
+        if (step.goal == TutorialGoal.Gather && thunder != null) thunder.SpendAll(); // [변경] 빈 뇌기에서 직접 모아 보게
         if (step.goal == TutorialGoal.UnlockSkill) // 이미 해금했으면 바로 완료, 포인트가 없으면 막히지 않게 완료
         {
             OnSkillTreeChanged();
@@ -350,6 +373,15 @@ public class TutorialDirector : MonoBehaviour
     void OnSkillTreeChanged() => SetProgress(TutorialGoal.UnlockSkill, CountUnlocked() - unlockedAtStart);
     void OnUltimateFinished() => Add(TutorialGoal.Ultimate);
 
+    // [변경] 모은 뇌기 합이 정수 칸을 넘을 때마다 진행도 +1
+    void OnGathered(float amount)
+    {
+        Lesson step = Current;
+        if (step == null || step.goal != TutorialGoal.Gather) return;
+        gathered += amount;
+        SetProgress(TutorialGoal.Gather, Mathf.FloorToInt(gathered + 0.001f));
+    }
+
     void OnLockOn(Transform target)
     {
         if (target != null) Add(TutorialGoal.LockOn);
@@ -374,12 +406,12 @@ public class TutorialDirector : MonoBehaviour
         L(1, 1, TutorialGoal.JustDodge, 1, "저스트 회피", "수련 상대가 나왔습니다. 공격이 닿기 직전에 회피하면 시간이 느려지고 뇌기 1칸을 얻습니다.", "Shift (타이밍)", skippable: true),
         L(1, 1, TutorialGoal.Parry, 1, "패링", "가만히 선 채로 적의 칼이 닿기 직전에 우클릭. 뇌기 1칸을 씁니다.", "우클릭 (대기 중)", fillGauge: true, skippable: true),
         L(1, 1, TutorialGoal.Kanpa, 1, "역뢰", "콤보 중 적이 공격하면 우클릭 강공격으로 맞받아치세요.", "좌클릭 콤보 → 우클릭", skippable: true),
-        L(1, 1, TutorialGoal.Execute, 1, "처형", "패링으로 적을 무너뜨린 뒤 가까이에서 F.", "우클릭 패링 → F", fillGauge: true, skippable: true),
+        L(1, 1, TutorialGoal.Gather, 1, "뇌기 집중", "적이 가까이 있을 때 우클릭을 누르고 버티면 뇌기가 모입니다. 맞으면 끊기니 틈을 보세요. 뇌기 1칸.", "우클릭 홀드", skippable: true), // [변경] 처형 단계 대신
 
         L(2, 2, TutorialGoal.TapStrike, 1, "섬뢰일도", "Q를 짧게 누르면 가까운 적에게 번개처럼 돌진해 벱니다. 뇌기 1칸.", "Q 탭", fillGauge: true),
         L(2, 2, TutorialGoal.StanceDraw, 3, "발도 자세", "Q를 길게 누른 채 화면 가운데 조준점을 적에게 올려 표식 3개. 떼면 차례로 벱니다.", "Q 홀드 → 조준 → 떼기", fillGauge: true),
 
-        L(3, 2, TutorialGoal.EnchantStrike, 3, "뇌신 강림", "뇌기 2칸으로 R. 6초 동안 빨라지고 휘두를 때마다 검기가 날아가며, 맞힌 적 주변으로 번개가 튑니다.", "R → 좌클릭", fillGauge: true), // [변경]
+        L(3, 2, TutorialGoal.EnchantStrike, 3, "뇌신 강림", "뇌기 2칸으로 R. 6초 동안 빨라지고 휘두를 때마다 검기가 날아가며, 맞힌 적 주변으로 번개가 튑니다.", "R → 좌클릭", fillGauge: true),
 
         L(4, -1, TutorialGoal.ShrineRest, 1, "화톳불", "수련장 가장자리의 화톳불 앞에서 E. 체력이 회복되고 스킬트리가 열립니다.", "E"),
         L(4, -1, TutorialGoal.UnlockSkill, 1, "스킬 해금", "스킬 포인트로 기술을 하나 해금하세요. 노드를 고르면 미리보기 영상이 나옵니다.", "클릭 → 해금"),

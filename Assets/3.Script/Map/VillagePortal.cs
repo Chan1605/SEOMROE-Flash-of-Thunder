@@ -9,6 +9,8 @@ using UnityEngine.UI;
 //  - guide: 목표 표식(같은 오브젝트의 ObjectiveBeacon)을 언제 이 포탈에 켤지
 //  - 수련 완료 = 이번 판에 수련장을 나왔거나(RunState 표시) 예전에 한 번이라도 끝냈으면
 //  - 잠긴 포탈에 다가가면: 안내 문구 + 카메라가 봉인된 문 → 지금 가야 할 포탈 순서로 비춤
+//  - [변경] routes: 진행 표시(RunState flag)에 따라 목적지를 바꿈. 위에서부터 조건이 맞는 첫 경로 (흑뢰 토벌 뒤 산문 → 시련의 터)
+//    산문 포탈에 경로가 비어 있으면 기본 경로(토벌 → 시련의 터)를 코드에서 채움 → 씬을 고치지 않아도 적용, 인스펙터에서 덮어쓸 수 있음
 public class VillagePortal : MonoBehaviour
 {
     public const string VillageScene = "Village";
@@ -18,6 +20,17 @@ public class VillagePortal : MonoBehaviour
     public const string FromVillageFlag = "FromVillage"; // 마을 포탈로 떠났다는 표시 (연습장에서 마을로 돌아가기 허용)
 
     public enum When { Always, BeforeTutorial, AfterTutorial, Never }
+    public const string TrialSpawn = "Zone_3_Trial/Generated/RespawnPoint"; // [변경] 본편 시련의 터 입구
+
+    // [변경] 진행에 따른 목적지. requireFlag가 켜져 있으면 이 경로 (scene이 비면 원래 씬)
+    [System.Serializable]
+    public class Route
+    {
+        public string requireFlag;
+        public string scene;
+        public string spawnAt;
+        public string displayName;
+    }
 
     [SerializeField] string sceneName = "InGame";
     [SerializeField] string spawnAt = "";
@@ -38,6 +51,9 @@ public class VillagePortal : MonoBehaviour
     [SerializeField] string altScene = "";
     [SerializeField] string altName = "";
 
+    [Header("Routes")] // [변경]
+    [SerializeField] List<Route> routes = new List<Route>();
+
     // 잠긴 문 안내 연출
     [Header("Locked Guide")]
     [SerializeField] string lockedTitle = "수련장을 먼저 마치고 오세요";
@@ -50,8 +66,27 @@ public class VillagePortal : MonoBehaviour
     public static bool TutorialDone => RunState.HasFlag(TutorialDoneFlag) || TutorialDirector.CompletedBefore;
 
     bool UseAlt => !string.IsNullOrEmpty(altScene); // 새 게임은 항상 수련장부터라 마을에선 수련을 마친 뒤 → 수련장 포탈은 늘 연습장
-    string TargetScene => UseAlt ? altScene : sceneName;
-    string TargetName => UseAlt && !string.IsNullOrEmpty(altName) ? altName : displayName;
+    // [변경] 진행 경로가 있으면 그쪽이 우선
+    Route ActiveRoute => routes.Find(r => r != null && !string.IsNullOrEmpty(r.requireFlag) && RunState.HasFlag(r.requireFlag));
+    string TargetScene
+    {
+        get
+        {
+            Route r = ActiveRoute;
+            if (r != null && !string.IsNullOrEmpty(r.scene)) return r.scene;
+            return UseAlt ? altScene : sceneName;
+        }
+    }
+    string TargetSpawn => ActiveRoute != null ? ActiveRoute.spawnAt : spawnAt;
+    string TargetName
+    {
+        get
+        {
+            Route r = ActiveRoute;
+            if (r != null && !string.IsNullOrEmpty(r.displayName)) return r.displayName;
+            return UseAlt && !string.IsNullOrEmpty(altName) ? altName : displayName;
+        }
+    }
 
     static bool Check(When w) =>
         w == When.Always || (w == When.BeforeTutorial && !TutorialDone) || (w == When.AfterTutorial && TutorialDone);
@@ -61,13 +96,20 @@ public class VillagePortal : MonoBehaviour
     Text prompt;
     ParticleSystem swirl;
     Light glow;
-    WarpPortalFx portalFx; // [변경] 소용돌이 포탈 면 (SG_WarpPortal)
+    WarpPortalFx portalFx; // 소용돌이 포탈 면 (SG_WarpPortal)
     Material barrierMat;
     bool open, wasOpen, near, wasNear, showing; // wasNear · showing
     CanvasGroup banner;
     Text bannerTitle, bannerSub;
 
-    void OnEnable() => all.Add(this);  
+    void OnEnable() => all.Add(this);
+
+    void Awake()
+    {
+        // [변경] 산문 포탈 기본 경로: 흑뢰 토벌 뒤엔 시련의 터 입구로
+        if (routes.Count == 0 && sceneName == SceneTransition.MainScene)
+            routes.Add(new Route { requireFlag = BossReward.ClearedFlag, scene = SceneTransition.MainScene, spawnAt = TrialSpawn, displayName = "시련의 터" });
+    }
     void OnDisable() => all.Remove(this);
 
     static int savedScene = -1;
@@ -85,7 +127,7 @@ public class VillagePortal : MonoBehaviour
         if (barrier != null && barrier.TryGetComponent(out Renderer r)) barrierMat = r.material; // 이 문만 색을 바꾸도록 복사본
        // BuildSwirl();
         portalFx = WarpPortalFx.Create(transform, transform.TransformPoint(Vector3.up * 2.5f), transform.rotation, portalRadius * 0.95f,
-            new Color(color.r * 0.8f, color.g * 1.1f, color.b * 1.8f), new Color(0.02f, 0.06f, 0.2f), false, 0f); // [변경] 빛은 기존 Glow가 담당
+            new Color(color.r * 0.8f, color.g * 1.1f, color.b * 1.8f), new Color(0.02f, 0.06f, 0.2f), false, 0f); // 빛은 기존 Glow가 담당
         BuildPrompt();
         BuildBanner();
         wasOpen = !Check(unlock);
@@ -130,7 +172,7 @@ public class VillagePortal : MonoBehaviour
         }
         if (!pressed) return;
         RunState.SetFlag(FromVillageFlag);
-        SceneTransition.Load(TargetScene, true, spawnAt);
+        SceneTransition.Load(TargetScene, true, TargetSpawn); // [변경]
     }
 
     // 열림: 푸른 결계 + 소용돌이 / 잠김: 붉고 흐린 결계, 소용돌이 없음
@@ -143,7 +185,7 @@ public class VillagePortal : MonoBehaviour
             else barrierMat.color = c;
         }
         if (glow != null) glow.color = open ? color : lockedColor;
-        if (portalFx != null) // [변경] 열리면 포탈이 펼쳐지고, 잠기면 접힘 (붉은 결계만)
+        if (portalFx != null) // 열리면 포탈이 펼쳐지고, 잠기면 접힘 (붉은 결계만)
         {
             if (open) portalFx.Open(0.7f);
             else portalFx.Close(0.4f);
