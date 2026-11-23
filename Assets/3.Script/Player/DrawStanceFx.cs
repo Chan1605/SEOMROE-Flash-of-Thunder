@@ -5,9 +5,9 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 // 발도 자세 연출 (PlayerSkill이 실행 중 자동으로 붙임, 셋업 불필요)
-//  - 화면 흑백 + 비네트 (UI는 후처리를 안 받으므로 표식만 색이 남음)
+//  - 화면 흑백 + 비네트 (UI는 후처리를 안 받으므로 표식만 색이 남음). [변경] 흑백은 PlayerSkill.StanceMonochrome일 때만 (끄면 비네트만)
 //  - 화면 중앙 조준 링 + 남은 시간 링
-//  - 조준 중인 적: 차오르는 원형 게이지 / 표식이 붙은 적: [변경] 숫자 대신 마름모 표식 (붙는 순간 튀어 나오고 천천히 흔들림, 벤 표식은 흐려지고 사선)
+//  - 조준 중인 적: 차오르는 원형 게이지 / 표식이 붙은 적: 숫자 대신 마름모 표식 (붙는 순간 튀어 나오고 천천히 흔들림, 벤 표식은 흐려지고 사선)
 // 전투 코드는 이 연출을 모르고, 여기서 PlayerSkill의 상태를 읽기만 함
 public class DrawStanceFx : MonoBehaviour
 {
@@ -23,11 +23,12 @@ public class DrawStanceFx : MonoBehaviour
     PlayerSkill skill;
     Camera cam;
     Volume volume;
+    ColorAdjustments grade; // [변경] 흑백 켜고 끄기 (Play 중 바꿔도 바로)
 
     RectTransform canvasRect;
     Image reticle, timerRing, markingRing;
     readonly List<Image> markRings = new List<Image>(); // 각성 발도는 표식 수 제한이 없어 필요한 만큼 늘림
-    readonly List<Image> markSlashes = new List<Image>(); // [변경] 번호 대신 벤 표식에 긋는 사선
+    readonly List<Image> markSlashes = new List<Image>(); // 번호 대신 벤 표식에 긋는 사선
     readonly List<float> markShownAt = new List<float>();
     Text hint;
     static Sprite ringSprite, discSprite, markSprite, slashSprite;
@@ -57,6 +58,7 @@ public class DrawStanceFx : MonoBehaviour
             float target = stance ? 1f : 0f;
             float speed = 1f / Mathf.Max(stance ? fadeIn : fadeOut, 0.01f);
             volume.weight = Mathf.MoveTowards(volume.weight, target, speed * dt);
+            if (grade != null) grade.saturation.value = skill.StanceMonochrome ? -100f : 0f; // [변경]
         }
 
         bool aiming = stance && !skill.StanceAutoDraw; // 회피 직후 자동 발도는 흑백·표식만 (조준 UI 없음)
@@ -77,7 +79,7 @@ public class DrawStanceFx : MonoBehaviour
         markingRing.enabled = marking != null && Place(markingRing.rectTransform, marking);
         if (markingRing.enabled) markingRing.fillAmount = skill.StanceMarkProgress;
 
-        // [변경] 표식: 마름모. 붙는 순간 크게 튀었다 자리 잡고, 천천히 흔들림. 이미 벤 표식은 흐려지고 사선
+        // 표식: 마름모. 붙는 순간 크게 튀었다 자리 잡고, 천천히 흔들림. 이미 벤 표식은 흐려지고 사선
         bool showMarks = skill.ShowStanceMarks;
         while (showMarks && markRings.Count < skill.StanceMarkCount) AddMark();
         float now = Time.unscaledTime;
@@ -120,8 +122,8 @@ public class DrawStanceFx : MonoBehaviour
         // 지정한 값만 Override → 씬의 기존 색 보정은 그대로
         VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
         volume.sharedProfile = profile;
-        ColorAdjustments color = profile.Add<ColorAdjustments>();
-        color.saturation.Override(-100f);
+        grade = profile.Add<ColorAdjustments>();
+        grade.saturation.Override(skill != null && skill.StanceMonochrome ? -100f : 0f); // [변경]
         Vignette vig = profile.Add<Vignette>();
         vig.intensity.Override(vignette);
         vig.smoothness.Override(0.5f);
@@ -156,7 +158,7 @@ public class DrawStanceFx : MonoBehaviour
         hint.rectTransform.anchoredPosition = new Vector2(0f, -120f);
         hint.rectTransform.sizeDelta = new Vector2(600f, 40f);
 
-        if (markSprite == null) markSprite = MakeMarkSprite(); // [변경]
+        if (markSprite == null) markSprite = MakeMarkSprite();
         if (slashSprite == null) slashSprite = MakeSlashSprite();
         for (int i = 0; i < 6; i++) AddMark(); // 기본 6개를 미리 만들고, 더 필요하면 LateUpdate에서 추가
 
@@ -166,7 +168,7 @@ public class DrawStanceFx : MonoBehaviour
     void AddMark()
     {
         int n = markRings.Count + 1;
-        Image mark = NewImage("Mark" + n, markSprite, markColor); // [변경] 마름모 표식 + 벤 뒤 사선
+        Image mark = NewImage("Mark" + n, markSprite, markColor); // 마름모 표식 + 벤 뒤 사선
         mark.rectTransform.sizeDelta = Vector2.one * (markSize * 0.85f);
         Image slash = NewImage("Slash", slashSprite, new Color(1f, 1f, 1f, 0.9f));
         slash.transform.SetParent(mark.transform, false);
@@ -178,7 +180,7 @@ public class DrawStanceFx : MonoBehaviour
         markShownAt.Add(0f);
     }
 
-    // [변경] 표식 모양: 바깥 마름모 테두리 + 네 꼭짓점 밖으로 짧은 침 + 가운데 작은 마름모 (흑백 화면에서 빨갛게 또렷이)
+    // 표식 모양: 바깥 마름모 테두리 + 네 꼭짓점 밖으로 짧은 침 + 가운데 작은 마름모 (흑백 화면에서 빨갛게 또렷이)
     static Sprite MakeMarkSprite()
     {
         const int size = 128;

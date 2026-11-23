@@ -23,6 +23,7 @@ public class SkillPackFx : MonoBehaviour
     void Awake()
     {
         if (skill == null) skill = GetComponent<PlayerSkill>();
+        if (GetComponent<DashSlashFx>() == null) gameObject.AddComponent<DashSlashFx>(); // [변경] 팩 대시 머즐 · 빔 대신 칼자국 + 경로 잔광
     }
 
     void OnEnable()
@@ -44,7 +45,7 @@ public class SkillPackFx : MonoBehaviour
 
     void LateUpdate()
     {
-        if (skill == null) return; // [변경] 발도 자세 차징 처리 삭제
+        if (skill == null) return; // 발도 자세 차징 처리 삭제
 
         // 핵심: 돌진 중(몸이 숨겨진 동안) 검기가 플레이어 자리를 따라가고, 돌진이 끝나면 그 자리에서 꼬리만 남기고 사라짐
         if (beamFx == null) return;

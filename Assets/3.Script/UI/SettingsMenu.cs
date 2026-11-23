@@ -186,7 +186,7 @@ public class SettingsMenu : MonoBehaviour
             case Page.Gameplay: BuildGameplay(); break;
             case Page.Graphics: BuildGraphics(); break;
             case Page.Audio: BuildAudio(); break;
-            case Page.Developer: BuildDeveloper(); break; // [변경]
+            case Page.Developer: BuildDeveloper(); break;
             case Page.Quit: BuildQuit(); break;
         }
         RefreshAll();
@@ -215,6 +215,7 @@ public class SettingsMenu : MonoBehaviour
         int row = 0;
         AddSlider(row++, "Mouse Sensitivity", 1f, 100f, () => GameSettings.Sensitivity, v => GameSettings.Sensitivity = Mathf.Round(v), v => Mathf.RoundToInt(v).ToString());
         AddToggle(row++, "Damage Numbers", () => GameSettings.ShowDamageNumbers, v => GameSettings.ShowDamageNumbers = v);
+        AddToggle(row++, "Draw Stance B&W", () => GameSettings.StanceMonochrome, v => GameSettings.StanceMonochrome = v); // [변경] 발도 자세 흑백
     }
 
     void BuildGraphics()
@@ -233,7 +234,7 @@ public class SettingsMenu : MonoBehaviour
         AddSlider(row++, "Effects Volume", 0f, 1f, () => AudioOptions.Sfx, v => AudioOptions.Sfx = v, null);
     }
 
-    // [변경] 시연용: 무적 · 레벨업 · 게이지 채우기 (DevCheats, 저장 안 함)
+    // 시연용: 무적 · 레벨업 · 게이지 채우기 (DevCheats, 저장 안 함)
     void BuildDeveloper()
     {
         int row = 0;
@@ -489,7 +490,7 @@ public class SettingsMenu : MonoBehaviour
         categoryDiamond.raycastTarget = false;
         categoryDiamond.rectTransform.sizeDelta = new Vector2(10f, 10f);
         categoryDiamond.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
-        for (int i = 0; i < CategoryCount; i++) // [변경]
+        for (int i = 0; i < CategoryCount; i++)
         {
             int index = i;
             Text t = AddTextButton((RectTransform)menuGo.transform, CategoryNames[i], 32, 170f, CategoryY(i), 260f, () => ShowPage((Page)(index + 1)));
@@ -500,7 +501,7 @@ public class SettingsMenu : MonoBehaviour
         }
         if (inGame)
         {
-            float y = CategoryY(CategoryCount) + 20f; // [변경] 분류 수에 맞춰 아래로
+            float y = CategoryY(CategoryCount) + 20f; // 분류 수에 맞춰 아래로
             AddTextButton((RectTransform)menuGo.transform, "QUIT GAME", 22, 170f, y, 300f, () => ShowPage(Page.Quit));
             skipTutorialText = AddTextButton((RectTransform)menuGo.transform, "SKIP TUTORIAL", 22, 170f, y + 48f, 300f, SkipTutorial);
         }

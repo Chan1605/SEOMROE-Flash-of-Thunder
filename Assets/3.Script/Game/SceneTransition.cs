@@ -21,7 +21,7 @@ public class SceneTransition : MonoBehaviour
 
     public static bool Busy => current != null;
 
-    // [변경] keepSnapshot: 지금 상태를 저장하지도 비우지도 않고 떠나기 직전 저장본을 그대로 씀 (연습장의 전부 해금을 본편에 가져오지 않게)
+    // keepSnapshot: 지금 상태를 저장하지도 비우지도 않고 떠나기 직전 저장본을 그대로 씀 (연습장의 전부 해금을 본편에 가져오지 않게)
     public static void Load(string sceneName, bool carryState = true, string spawnAt = null, bool keepSnapshot = false) // spawnAt: 도착 씬에서 플레이어를 옮길 오브젝트 경로
     {
         if (current != null) return;
@@ -33,15 +33,22 @@ public class SceneTransition : MonoBehaviour
         current.StartCoroutine(current.Run(sceneName, carryState, keepSnapshot));
     }
 
+    // [변경] 창이 포커스를 잃으면 게임이 멈춰(Run In Background 꺼짐) 로딩이 100%에서 안 넘어갔음 → 전환하는 동안만 백그라운드에서도 계속 돌림
+    bool savedRunInBackground;
+
+    void OnDestroy() => Application.runInBackground = savedRunInBackground;
+
     IEnumerator Run(string sceneName, bool carryState, bool keepSnapshot)
     {
+        savedRunInBackground = Application.runInBackground;
+        Application.runInBackground = true;
         Canvas canvas = UIKit.CreateCanvas(transform, "Fade", 500); // 메뉴보다 위
         cover = UIKit.Image(canvas.transform, null, new Color(0f, 0f, 0f, 0f));
         UIKit.Stretch(cover.rectTransform);
 
         yield return Fade(0f, 1f, FadeOut);
 
-        if (keepSnapshot) { } // [변경]
+        if (keepSnapshot) { }
         else if (carryState) RunState.Capture();
         else RunState.Clear();
         if (GamePause.IsPaused) GamePause.Set(false);

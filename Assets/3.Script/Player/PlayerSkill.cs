@@ -28,6 +28,13 @@ public partial class PlayerSkill : MonoBehaviour // 발도 자세는 PlayerSkill
     [SerializeField] PlayerThunder thunder; // 있으면 뇌기 소모형 일섬 + 흐트러진 적만 즉사·연쇄
     [SerializeField] PlayerStance stance;   // 일섬이 끝나면 납도 → 평상시 자세 (락온 중이면 그대로 전투 자세)
     [SerializeField] bool sheatheAfterSkill = true;
+    [SerializeField] int stanceCutMinMarks = 4;     // 발도 연쇄로 이만큼 이상 베면 마무리 납도 때 가벼운 화면 베기 (0 = 끔)
+    [SerializeField] float stanceCutAngle = 8f;
+    [SerializeField] float stanceCutHold = 0.15f;      // 선이 그어진 뒤 최소 대기 (그 뒤 칼이 들어가는 순간 갈라짐)
+    [SerializeField] float stanceCutSheatheAt = 0.5f;  // 납도 모션의 이 지점 = 칼이 들어감 (천뢰일섬과 같은 값)
+    // [변경] 발도 자세 흑백 (차징 화면 + 마무리 화면 베기 둘 다)은 ESC · 타이틀 설정 GAMEPLAY > Draw Stance B&W (저장됨)
+    public bool StanceMonochrome => GameSettings.StanceMonochrome;
+    bool cutPending; // 화면 베기가 갈라지기 전까지 일괄 피해를 미룸
     [SerializeField] bool sheatheOnLand = true;  // 마지막 돌진이 끝나자마자 납도 → 칼이 들어가는 순간 일괄 낙뢰 (허공 베기 모션 없음)
 
     [SerializeField] float aimTurnSpeed = 720f; // 자세·차지 중 고정한 대상을 따라 도는 속도(도/초, 실제 시간)
@@ -161,7 +168,7 @@ public partial class PlayerSkill : MonoBehaviour // 발도 자세는 PlayerSkill
     void TryBegin()
     {
         if (health == null) health = GetComponent<PlayerHealth>();
-        if (health != null && health.ActionLocked) return; // [변경] 궁극기 연출 중엔 Q 막음
+        if (health != null && health.ActionLocked) return; // 궁극기 연출 중엔 Q 막음
 
         // 각성 중 · 저스트 회피 직후면 바로 발도 자세 (비용은 InstantStanceEntry에서 확인)
         StanceEntry instant = InstantStanceEntry();
@@ -404,6 +411,19 @@ public partial class PlayerSkill : MonoBehaviour // 발도 자세는 PlayerSkill
         // 착지하자마자 납도 (락온 중이면 SheatheNow가 거절 → Release 자세 유지) // 잔심 자세 분기 삭제
         sheathedEarly = sheatheOnLand && sheatheAfterSkill && stance != null && stance.SheatheNow();
         if (!sheathedEarly) PlayLandPose(); // 락온 중 등 납도를 못 하면 처형 모션 대신 전투 대기 자세
+
+        // 많이 모아 벤 발도: 천뢰일섬처럼 납도 시작에 흰 선 → 칼이 들어가는 순간 화면이 갈라지며 한꺼번에 베임
+        //  갈라질 때까지 적은 멈추고 일괄 피해를 미룸 (UpdateFinishing이 cutPending을 기다림)
+        cutPending = false;
+        if (stanceChain && stanceCutMinMarks > 0 && dashCount >= stanceCutMinMarks && UltimateFx.Current != null)
+        {
+            cutPending = UltimateFx.Current.CutLight(stanceCutAngle, Color.white, stanceCutHold,
+                () => { cutPending = false; CombatTime.ClearHold(); },
+                () => !sheathedEarly || stance == null || stance.SheatheProgress < 0f || stance.SheatheProgress >= stanceCutSheatheAt,
+                1.2f, false, StanceMonochrome); // [변경]
+            if (cutPending) CombatTime.SetHold(0.02f);
+        }
+
     }
 
     // 칼을 거둔 뒤 한 박자 늦게 베인 대상들에 일괄 적용
@@ -411,7 +431,7 @@ public partial class PlayerSkill : MonoBehaviour // 발도 자세는 PlayerSkill
     {
         finishTimer += dt;
 
-        if (!killsApplied && finishTimer >= data.KillDelay)
+        if (!killsApplied && !cutPending && finishTimer >= data.KillDelay) // 화면 베기 중이면 갈라지는 순간까지 기다림
         {
             ApplyPendingHits();
             killsApplied = true;
@@ -459,6 +479,7 @@ public partial class PlayerSkill : MonoBehaviour // 발도 자세는 PlayerSkill
             if (followCamera != null) followCamera.Shake(0.25f, 0.2f);
         }
 
+
         Debug.Log($"[Skill] 벽력일섬 {dashCount}연 · {applied}명 베기");
     }
 
@@ -466,6 +487,7 @@ public partial class PlayerSkill : MonoBehaviour // 발도 자세는 PlayerSkill
     {
         if (phase == Phase.Holding || phase == Phase.Stance) HoldEnded?.Invoke(); // 차지·발도 자세 도중 끊긴 경우에도 이펙트 정리 // Stance 포함
         ClearStance(); // 적 정지 해제 · 표식 정리
+        cutPending = false;
         ClearPassSlow();
         phase = Phase.Ready;
         RestoreTimeScale();

@@ -11,6 +11,21 @@ public class UltimateFx : MonoBehaviour
 {
     const float BarHeight = 120f;
 
+    // 화면 베기 모양: 궁극기(천뢰일섬)는 크게, 뇌신참 · 섬뢰일도 마무리는 가볍게 같은 연출을 빌려 씀
+    struct CutStyle
+    {
+        public float slide, gap, time, line, glow;
+        public Color lineColor, glowColor;
+        public bool overlay; // 작은 천뢰일섬: 베는 동안 흑백 · HUD 숨김 (조각이 화면 전체를 덮어 아래가 움직여도 안 보임)
+        public bool freeze;  // 시간도 멈춤 (납도처럼 아래에서 모션이 진행돼야 하면 끔 — 천뢰일섬과 같은 방식)
+        public bool mono;    // [변경] 흑백 (끄면 색은 그대로 두고 HUD만 숨김)
+    }
+    static readonly CutStyle Heavy = new CutStyle { slide = 54f, gap = 5f, time = 0.5f, line = 3f, glow = 14f, lineColor = Color.white, glowColor = new Color(0.75f, 0.85f, 1f, 0.35f) };
+
+    public static UltimateFx Current { get; private set; } // 다른 기술이 가벼운 화면 베기를 부를 때
+    public bool Cutting => cutRoot != null && cutRoot.activeSelf;
+    CutStyle style = Heavy;
+
     Volume volume;
     ColorAdjustments color;
     Vignette vignette;
@@ -43,19 +58,21 @@ public class UltimateFx : MonoBehaviour
 
     void Awake()
     {
+        Current = this;
         BuildVolume();
         BuildOverlay();
     }
 
     void OnDestroy()
     {
+        if (Current == this) Current = null;
         RestoreSky();
         if (cutShot != null) Destroy(cutShot);
         if (volume != null) Destroy(volume.gameObject);
     }
 
     // ===== 명령 =====
-    public Canvas Overlay { get; private set; } // [변경]
+    public Canvas Overlay { get; private set; }
 
     public void Letterbox(bool on) => barTarget = on ? 1f : 0f;
     public void Desaturate(float amount) => desatTarget = Mathf.Clamp01(amount);
@@ -92,7 +109,19 @@ public class UltimateFx : MonoBehaviour
     // 화면 베기. onSplit: 조각이 어긋나기 시작하는 순간 (피해 · 낙뢰를 여기서)
     // splitWhen: 이 조건이 참이 되는 순간 어긋남 (납도해서 칼이 들어가는 순간 등). hold는 최소 정지, maxHold가 지나면 무조건
     public void Cut(float angle, float hold, System.Action onSplit, System.Func<bool> splitWhen = null, float maxHold = 1.5f) =>
-        StartCoroutine(CutRoutine(angle, hold, onSplit, splitWhen, maxHold));
+        StartCoroutine(CutRoutine(angle, hold, onSplit, splitWhen, maxHold, Heavy));
+
+    // 작은 천뢰일섬: 흑백 · HUD 숨김 → 색 선 → hold초 이상 + splitWhen이 참이 되는 순간 갈라지며 색이 돌아옴. 이미 베는 중이면 false
+    //  freezeTime이 거짓이면 시간은 흐름 (천뢰일섬처럼 조각 아래에서 납도가 진행되고 칼이 들어가는 순간 갈라짐)
+    public bool CutLight(float angle, Color color, float hold, System.Action onSplit = null, System.Func<bool> splitWhen = null,
+        float maxHold = 0f, bool freezeTime = true, bool monochrome = true) // [변경] monochrome: 흑백 여부
+    {
+        if (Cutting) return false;
+        var light = new CutStyle { slide = 40f, gap = 3f, time = 0.4f, line = 2.5f, glow = 12f, overlay = true, freeze = freezeTime, mono = monochrome,
+            lineColor = color, glowColor = new Color(color.r, color.g, color.b, 0.35f) };
+        StartCoroutine(CutRoutine(angle, hold, onSplit, splitWhen, maxHold > 0f ? maxHold : hold + 0.5f, light));
+        return true;
+    }
 
     public void EndAll()
     {
@@ -146,8 +175,21 @@ public class UltimateFx : MonoBehaviour
 
     // 핵심: 프레임 끝에 화면을 찍어 위 · 아래 조각(선 기준으로 자른 마스크)에 입힘
     //  ① 실선이 0.05초에 화면 끝까지 그어짐 → ② 잠깐 정지 → ③ 두 조각이 선을 따라 반대로 미끄러지며 살짝 벌어짐 → ④ 찍어 둔 화면이 걷히며 실제 화면
-    IEnumerator CutRoutine(float angle, float hold, System.Action onSplit, System.Func<bool> splitWhen, float maxHold)
+    IEnumerator CutRoutine(float angle, float hold, System.Action onSplit, System.Func<bool> splitWhen, float maxHold, CutStyle s)
     {
+        style = s; // 모양 값을 받아 같은 루틴으로
+        if (s.overlay) // (멈추고) · HUD 끄고 · 바로 흑백 → 그 화면을 한 프레임 그린 뒤 찍음 (조각과 실제 화면이 같게)
+        {
+            if (s.freeze) Time.timeScale = 0f;
+            MenuOverlay.Show(this, Overlay);
+            if (s.mono) // [변경]
+            {
+                desat = desatTarget = 0.85f;
+                volume.weight = desat;
+                color.saturation.value = -100f * desat;
+            }
+            yield return null;
+        }
         yield return new WaitForEndOfFrame();
         if (cutShot != null) Destroy(cutShot);
         cutShot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
@@ -171,8 +213,8 @@ public class UltimateFx : MonoBehaviour
             img.rectTransform.localRotation = Quaternion.Inverse(rot); // 조각은 기울어도 그림은 똑바로
         }
         cutLine.localRotation = cutGlow.localRotation = rot;
-        cutLine.sizeDelta = new Vector2(0f, 3f);
-        cutGlow.sizeDelta = new Vector2(0f, 14f);
+        cutLine.sizeDelta = new Vector2(0f, s.line);
+        cutGlow.sizeDelta = new Vector2(0f, s.glow);
         SetLineAlpha(1f);
         cutGroup.alpha = 1f;
         cutRoot.SetActive(true);
@@ -181,24 +223,32 @@ public class UltimateFx : MonoBehaviour
         for (float t = 0f; t < 0.05f; t += Time.unscaledDeltaTime)
         {
             float k = t / 0.05f;
-            cutLine.sizeDelta = new Vector2(length * k, 3f);
-            cutGlow.sizeDelta = new Vector2(length * k, 14f);
+            cutLine.sizeDelta = new Vector2(length * k, s.line);
+            cutGlow.sizeDelta = new Vector2(length * k, s.glow);
             yield return null;
         }
-        cutLine.sizeDelta = new Vector2(length, 3f);
-        cutGlow.sizeDelta = new Vector2(length, 14f);
+        cutLine.sizeDelta = new Vector2(length, s.line);
+        cutGlow.sizeDelta = new Vector2(length, s.glow);
         for (float t = 0f; t < maxHold; t += Time.unscaledDeltaTime)
         {
             if (t >= hold && (splitWhen == null || splitWhen())) break;
+            if (s.freeze) Time.timeScale = 0f; // 다른 기능(히트스톱 복구 등)이 풀어도 끝까지 멈춤
             yield return null;
         }
 
         if (onSplit != null) onSplit();
-        const float slide = 0.5f;
+        if (s.overlay) // 천뢰일섬처럼 갈라지는 순간 (다시 움직이고) 색이 천천히 돌아옴
+        {
+            if (s.freeze) Time.timeScale = GamePause.IsPaused ? 0f : 1f;
+            desatTarget = 0f;
+            Flash(s.lineColor, 0.25f);
+            MenuOverlay.Hide(this);
+        }
+        float slide = s.time;
         for (float t = 0f; t < slide; t += Time.unscaledDeltaTime)
         {
             float k = 1f - Mathf.Pow(1f - t / slide, 3f); // 처음에 확 어긋나고 천천히 멈춤
-            Vector2 offset = along * (54f * k) + normal * (5f * k);
+            Vector2 offset = along * (s.slide * k) + normal * (s.gap * k);
             cutTop.anchoredPosition = offset;
             cutBottom.anchoredPosition = -offset;
             SetLineAlpha(1f - k);
@@ -212,8 +262,8 @@ public class UltimateFx : MonoBehaviour
 
     void SetLineAlpha(float a)
     {
-        cutLine.GetComponent<Image>().color = new Color(1f, 1f, 1f, a);
-        cutGlow.GetComponent<Image>().color = new Color(0.75f, 0.85f, 1f, 0.35f * a);
+        cutLine.GetComponent<Image>().color = new Color(style.lineColor.r, style.lineColor.g, style.lineColor.b, a);
+        cutGlow.GetComponent<Image>().color = new Color(style.glowColor.r, style.glowColor.g, style.glowColor.b, style.glowColor.a * a);
     }
 
     // ===== 만들기 =====
@@ -242,7 +292,7 @@ public class UltimateFx : MonoBehaviour
         font = menu != null ? menu.TitleFont : null;
 
         Canvas canvas = UIKit.CreateCanvas(transform, "UltimateCanvas", 40); // HUD 위, 메뉴 아래
-        Overlay = canvas; // [변경] 궁극기 중 이 캔버스만 남기고 나머지 UI를 숨길 때 사용
+        Overlay = canvas; // 궁극기 중 이 캔버스만 남기고 나머지 UI를 숨길 때 사용
         Transform root = canvas.transform;
         canvasRect = (RectTransform)root;
 

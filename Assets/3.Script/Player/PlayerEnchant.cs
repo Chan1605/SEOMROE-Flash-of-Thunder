@@ -99,7 +99,7 @@ public class PlayerEnchant : MonoBehaviour
     int lastWaveClip = -1;
     PlayerStats stats;
     PlayerCombat combat;
-    PlayerLockOn lockOn; // [변경]
+    PlayerLockOn lockOn;
 
     public bool IsActive => remaining > 0f;
     public float Remaining01 => total > 0f ? remaining / total : 0f;
@@ -224,13 +224,13 @@ public class PlayerEnchant : MonoBehaviour
             return;
         }
         if (!IsActive) return;
-        Vector3 forward = WaveDirection(); // [변경] 락온 중엔 몸 방향과 상관없이 대상 쪽으로
+        Vector3 forward = WaveDirection(); // 락온 중엔 몸 방향과 상관없이 대상 쪽으로
         PlayWaveSound();
         EnchantWave.Fire(gameObject, transform.position + Vector3.up * 1.1f + forward * 0.6f, forward,
             waveRange, waveWidth, waveDamage, wavePosture, LabelColor, 1f, false, waveSpeed); // waveSpeed
     }
 
-    // [변경] 락온 대상이 있으면 대상 쪽(수평), 없으면 몸이 보는 쪽
+    // 락온 대상이 있으면 대상 쪽(수평), 없으면 몸이 보는 쪽
     Vector3 WaveDirection()
     {
         if (lockOn == null) lockOn = GetComponent<PlayerLockOn>();
@@ -350,6 +350,7 @@ public class PlayerEnchant : MonoBehaviour
         EnchantWave.Fire(gameObject, transform.position + Vector3.up * 1.1f + forward * 0.8f, forward,
             finisherRange, finisherWidth, damage, posture, LabelColor, finisherScale, true, finisherSpeed, finisherImpact); // 임팩트
         CombatTime.SlowEnemies(0.05f, 0.12f, 0.1f); // 발사 순간 짧은 멈춤
+        // [변경] 발사 순간 화면 베기는 뺌 (날아가는 장면을 끊음) → 검기가 여러 명을 베거나 터질 때로 옮김 (EnchantWave.Impact.screenCutHits)
         if (releaseFreeze > 0f) StartCoroutine(Freeze(releaseFreeze));
         if (logEnchant) Debug.Log($"[Enchant] 뇌신참 · 맞힌 수 {hits} → 피해 {damage:0} · 체간 {posture:0}");
         Finish(false); // 강림은 여기서 끝 (방전 없음)
@@ -403,7 +404,7 @@ public class PlayerEnchant : MonoBehaviour
     // 락온 대상이 있으면 그쪽, 없으면 카메라가 보는 쪽
     void FaceTarget()
     {
-        if (lockOn == null) lockOn = GetComponent<PlayerLockOn>(); // [변경] 검기와 같은 참조 사용
+        if (lockOn == null) lockOn = GetComponent<PlayerLockOn>(); // 검기와 같은 참조 사용
         Vector3 dir = lockOn != null && lockOn.Target != null ? lockOn.Target.position - transform.position
             : followCamera != null ? followCamera.transform.forward : transform.forward;
         dir.y = 0f;

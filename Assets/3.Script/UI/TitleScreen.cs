@@ -7,8 +7,8 @@ using UnityEngine.UI;
 
 // 타이틀: 3D 무대(TitleStage) + "PRESS ANY KEY" 대문 + 키보드로 고르는 메뉴
 // 흐름: 검은 화면에서 번개와 함께 로고가 베이듯 나타남 → 아무 키 → 카메라가 검객에게 다가가고 로고는 왼쪽 위, 메뉴는 왼쪽
-//  - [변경] LOAD GAME: 저장이 있으면 맨 위 (레벨 · 저장 시각), 저장본을 불러 마을부터
-//  - [변경] NEW GAME: 항상 수련장부터 → 마을. 저장이 있으면 지울지 한 번 묻고 시작
+//  - LOAD GAME: 저장이 있으면 맨 위 (레벨 · 저장 시각), 저장본을 불러 마을부터
+//  - NEW GAME: 항상 수련장부터 → 마을. 저장이 있으면 지울지 한 번 묻고 시작
 //  - TRAINING: 자유 연습장 (씬이 빌드에 있으면 보임)
 //  - SETTINGS: 같은 씬의 SettingsMenu를 열고, 닫히면 메뉴로 돌아옴
 //  - 메뉴: ↑↓/W·S/마우스로 고르고 Enter·Space·클릭으로 결정, ESC는 한 단계 뒤로 (맨 위에서는 대문 화면으로)
@@ -27,7 +27,9 @@ public class TitleScreen : MonoBehaviour
     [SerializeField] float characterYaw = 215f;
     [SerializeField] string idleState = "Skill_Stance";
     [SerializeField] string releaseState = "Skill_Release";
-    [SerializeField] AudioClip bgm;
+    [SerializeField] AudioClip bgm; // [변경] 비어 있으면 Resources/Audio/Title/title_rain (빗소리 루프)
+    [SerializeField] AudioClip[] thunderClips; // 번개가 번쩍일 때 하나씩. 비어 있으면 Resources/Audio/Title/title_thunder_*
+    [SerializeField, Range(0f, 1f)] float thunderVolume = 0.8f;
     [SerializeField] string tutorialScene = "Tutorial";
     [SerializeField] string mainScene = "InGame";
     [SerializeField] string trainingScene = "Training";
@@ -69,7 +71,8 @@ public class TitleScreen : MonoBehaviour
     int selected;
     float menuBlend, flashTimer, flashLevel, introTime, brushPop;
     bool settingsOpen;
-    AudioSource music;
+    AudioSource music, thunder; // [변경] thunder = 번개 소리 (겹쳐 울릴 수 있게 PlayOneShot)
+    int lastThunder = -1;
 
     void Start()
     {
@@ -140,7 +143,7 @@ public class TitleScreen : MonoBehaviour
         AddItem(menuItems, menuRoot.transform, serif, "SETTINGS", "환경 설정", ref y, OpenSettings);
         AddItem(menuItems, menuRoot.transform, serif, "QUIT", "종료", ref y, Quit);
 
-        // [변경] 새 게임 확인 (저장이 있을 때만, 메뉴와 같은 자리에 바꿔 보여 줌)
+        // 새 게임 확인 (저장이 있을 때만, 메뉴와 같은 자리에 바꿔 보여 줌)
         choiceRoot = NewRoot(c, "StartChoice");
         choiceGroup = choiceRoot.AddComponent<CanvasGroup>();
         Text ask = UIKit.Text(choiceRoot.transform, "저장된 기록을 지우고 새로 시작할까요?", bodyFont, 22, accent, TextAnchor.MiddleLeft);
@@ -238,7 +241,7 @@ public class TitleScreen : MonoBehaviour
         item.label = UIKit.Text(parent, label, font, 32, new Color(1f, 1f, 1f, 0f), TextAnchor.MiddleLeft);
         UIKit.Place(item.label.rectTransform, MenuX, y, 300f, 56f);
         item.caption = UIKit.Text(parent, caption, bodyFont, 17, new Color(1f, 1f, 1f, 0f), TextAnchor.MiddleLeft);
-        UIKit.Place(item.caption.rectTransform, MenuX + 290f, y + 2f, 340f, 30f); // [변경] 이어하기 요약 · 확인 문구가 한 줄에 들어가게
+        UIKit.Place(item.caption.rectTransform, MenuX + 290f, y + 2f, 340f, 30f); // 이어하기 요약 · 확인 문구가 한 줄에 들어가게
         list.Add(item);
         y += 70f;
     }
@@ -264,7 +267,7 @@ public class TitleScreen : MonoBehaviour
         items[selected].action();
     }
 
-    // [변경] 새 게임 = 수련장 → (수련 완료) → 마을. 저장이 있으면 덮어쓸지 확인 (기본 선택은 뒤로)
+    // 새 게임 = 수련장 → (수련 완료) → 마을. 저장이 있으면 덮어쓸지 확인 (기본 선택은 뒤로)
     void NewGame()
     {
         if (!SaveGame.Exists)
@@ -407,6 +410,17 @@ public class TitleScreen : MonoBehaviour
         flashTimer = Random.Range(flashInterval.x, flashInterval.y);
         stage.Strike();
         StartCoroutine(SecondFlash());
+        PlayThunder(); // [변경]
+    }
+
+    // [변경] 번쩍임과 함께 천둥 (클립 안에 0.8~0.9초 뒤 터지는 소리가 있어 빛 → 소리 순서가 자연스러움). 직전과 다른 클립
+    void PlayThunder()
+    {
+        if (thunder == null || thunderClips == null || thunderClips.Length == 0 || phase == Phase.Leaving) return;
+        int pick = Random.Range(0, thunderClips.Length);
+        if (thunderClips.Length > 1 && pick == lastThunder) pick = (pick + 1) % thunderClips.Length;
+        lastThunder = pick;
+        if (thunderClips[pick] != null) thunder.PlayOneShot(thunderClips[pick], thunderVolume * AudioOptions.BgmVolume);
     }
 
     // 항목이 위에서부터 차례로 나타나고, 고른 항목은 오른쪽으로 살짝 밀리며 밝아짐. 붓질 · 마름모가 따라감
@@ -505,6 +519,13 @@ public class TitleScreen : MonoBehaviour
 
     void StartMusic()
     {
+        // [변경] 씬에 연결된 소리가 없으면 Resources 기본값 (빗소리 루프 + 천둥 2종)
+        if (bgm == null) bgm = Resources.Load<AudioClip>("Audio/Title/title_rain");
+        if (thunderClips == null || thunderClips.Length == 0)
+            thunderClips = new[] { Resources.Load<AudioClip>("Audio/Title/title_thunder_01"), Resources.Load<AudioClip>("Audio/Title/title_thunder_02") };
+        thunder = gameObject.AddComponent<AudioSource>();
+        thunder.spatialBlend = 0f;
+        thunder.playOnAwake = false;
         if (bgm == null) return;
         music = gameObject.AddComponent<AudioSource>();
         music.clip = bgm;
@@ -527,6 +548,7 @@ public class TitleScreen : MonoBehaviour
         for (float t = 0f; t < 0.7f; t += Time.unscaledDeltaTime)
         {
             music.volume = Mathf.Lerp(start, 0f, t / 0.7f);
+            if (thunder != null) thunder.volume = 1f - t / 0.7f; // [변경] 울리던 천둥도 같이 줄임
             yield return null;
         }
     }

@@ -878,6 +878,11 @@ MonoBehaviour:
   thunder: {fileID: 8397257810525060709}
   stance: {fileID: 0}
   sheatheAfterSkill: 1
+  stanceCutMinMarks: 4
+  stanceCutAngle: 8
+  stanceCutHold: 0.12
+  stanceCutSheatheAt: 0.5
+  stanceMonochrome: 0
   sheatheOnLand: 1
   aimTurnSpeed: 720
   staggerOnly: 0
@@ -1757,6 +1762,9 @@ MonoBehaviour:
     enemyHitStop: 0.08
     endBurst: 1
     palette: 0
+    screenCutHits: 0
+    screenCutHold: 0.12
+    screenCutAngle: -9
   dischargeDamage: 20
   dischargePostureDamage: 20
   dischargeRadius: 3
@@ -1786,12 +1794,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SkillPackFx
   skill: {fileID: 3070939792974395059}
-  dashMuzzle: {fileID: 6120445964550834281, guid: aa7f91c6190ce6540a0b18ab3483498d, type: 3}
-  dashBeam: {fileID: 6566792844633528751, guid: 7fb53264924cccf40957d50cddfdc266, type: 3}
+  dashMuzzle: {fileID: 0}
+  dashBeam: {fileID: 0}
   muzzleScale: 0.7
   beamScale: 1
   beamHeight: 1
-  cutHit: {fileID: 460321523706951053, guid: d4be339cf2250de4696c7b598a6d3fa9, type: 3}
+  cutHit: {fileID: 0}
   cutHitScale: 0.6
   cutHitHeight: 1
   lifetime: 3
