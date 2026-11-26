@@ -3,6 +3,8 @@ using UnityEngine.SceneManagement;
 
 // 배경음 진행기: 지금 상황에 맞는 곡 이름을 정하고 Resources/Audio/BGM/<이름>을 크로스페이드로 틂 (씬 수정 없이 자동 생성, 씬을 넘어도 유지)
 // 곡 파일만 넣으면 바로 적용. 없는 곡은 대체 이름으로, 그것도 없으면 조용히 줄임
+// [변경] 연출 소리(엔딩 스팅어 등)가 울릴 때도 Duck(초)로 같은 크기까지 줄임
+// 플레이어가 쓰러져 있는 동안은 배경음을 DeathDuck까지 빠르게 줄임 (사망 소리가 들리게), 부활하면 원래대로
 //   village · village_dawn(흑뢰 토벌 뒤, 없으면 village) · training(수련장 · 연습장) · field(산문 이동 중)
 //   result(결과 화면, 없으면 ending) · battle(구역 전투, 없으면 field) · trial(시련의 터, 없으면 battle) · dungeon · boss · boss_phase2(없으면 boss) · ending(엔딩 크레딧)
 // 타이틀은 TitleScreen이 직접 틀어서 여기서는 끔. 볼륨 = AudioOptions.BgmVolume
@@ -11,6 +13,8 @@ public class BgmDirector : MonoBehaviour
     const string Folder = "Audio/BGM/";
     const float FadeTime = 1.6f;
     const float CheckInterval = 0.5f;
+    const float DeathDuck = 0.2f; 
+    const float DuckFade = 0.3f;
 
     static BgmDirector instance;
     static readonly System.Collections.Generic.Dictionary<string, AudioClip> cache = new System.Collections.Generic.Dictionary<string, AudioClip>(); // 없는 곡도 null로 기억
@@ -19,6 +23,10 @@ public class BgmDirector : MonoBehaviour
     AudioSource current;
     string currentKey;
     float checkTimer;
+    PlayerHealth downed; // 쓰러진 플레이어 (부활하거나 사라지면 해제)
+    static float duckUntil; // 실제 시간 기준
+
+    public static void Duck(float seconds) => duckUntil = Mathf.Max(duckUntil, Time.unscaledTime + seconds);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Create()
@@ -34,7 +42,12 @@ public class BgmDirector : MonoBehaviour
         a = NewSource();
         b = NewSource();
         current = a;
+        PlayerHealth.AnyDied += OnPlayerDied;
     }
+
+    void OnDestroy() => PlayerHealth.AnyDied -= OnPlayerDied;
+
+    void OnPlayerDied(PlayerHealth who) => downed = who;
 
     AudioSource NewSource()
     {
@@ -58,10 +71,12 @@ public class BgmDirector : MonoBehaviour
         }
 
         // 크로스페이드: 지금 소스는 목표 볼륨으로, 다른 소스는 0으로
-        float target = AudioOptions.BgmVolume;
-        float step = Time.unscaledDeltaTime / FadeTime;
+        bool ducked = (downed != null && downed.IsDead) || Time.unscaledTime < duckUntil;
+        float full = AudioOptions.BgmVolume;
+        float target = ducked ? full * DeathDuck : full;
+        float step = Time.unscaledDeltaTime / (ducked ? DuckFade : FadeTime);
         AudioSource other = current == a ? b : a;
-        current.volume = Mathf.MoveTowards(current.volume, current.clip != null ? target : 0f, step * Mathf.Max(target, 0.01f));
+        current.volume = Mathf.MoveTowards(current.volume, current.clip != null ? target : 0f, step * Mathf.Max(full, 0.01f));
         other.volume = Mathf.MoveTowards(other.volume, 0f, step);
         if (other.isPlaying && other.volume <= 0f) other.Stop();
     }

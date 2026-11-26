@@ -52,7 +52,9 @@ public partial class EnemySwordsman
     bool comboStop;                       // 이번 타에서 연타를 끊음
     float pendingDelay, holdLeft, holdAt;  // 다음 타에 걸 지연 / 지금 타의 남은 멈춤 / 멈추는 지점(정규화)
     AttackData delayFor;                  // 지연을 걸 타 (거리 때문에 연타가 끊기면 다음 연타 첫 타에 잘못 걸리지 않게)
-    static readonly System.Collections.Generic.HashSet<EnemyData> introSeen = new System.Collections.Generic.HashSet<EnemyData>(); // 재도전 때 등장 연출 짧게
+    // [변경] 재도전 때 등장 연출 짧게. 씬이 바뀔 때마다 비움 → 같은 씬 안에서 다시 싸울 때만 건너뜀
+    //  (예전엔 게임을 끌 때까지 남아서 연습장 1:1 · 타이틀 복귀 뒤 본편 보스 컷씬이 빠졌음)
+    static readonly System.Collections.Generic.HashSet<EnemyData> introSeen = new System.Collections.Generic.HashSet<EnemyData>();
 
     Vector3 leapFrom, leapTo;
     bool leapLooping;
@@ -103,7 +105,12 @@ public partial class EnemySwordsman
         ActiveBoss = null;
         BossPhaseChanged = null;
         introSeen.Clear();
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= ClearIntroSeen; // [변경] 두 번 걸리지 않게 뺐다가 다시
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += ClearIntroSeen;
     }
+
+    // [변경] 새 씬의 보스 Start(HideUntilIntro)보다 먼저 불림
+    static void ClearIntroSeen(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode) => introSeen.Clear();
 
     void InitBoss()
     {
@@ -582,7 +589,7 @@ public partial class EnemySwordsman
                 Damage = data.WaveDamage * DamageMul,
                 Weight = AttackWeight.Heavy
             }, waveVisual, waveHitVfx, telegraphMaterial)
-                .Parry(data.WaveParryable, data.WaveReflect, data.WaveReflectDamage, data.WaveReflectPosture); // [변경] 검기 패링 · 되받아치기
+                .Parry(data.WaveParryable, data.WaveReflect, data.WaveReflectDamage, data.WaveReflectPosture); // 검기 패링 · 되받아치기
         }
     }
 

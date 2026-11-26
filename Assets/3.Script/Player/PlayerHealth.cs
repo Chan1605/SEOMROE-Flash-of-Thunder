@@ -64,6 +64,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public event System.Action<DamageInfo> Damaged; // 피격 이펙트용
     // 구독자(ZoneArena)가 있으면 사망 → 구역 입구에서 부활, 없으면 예전처럼 테스트용 체력 회복
     public event System.Action Died;
+    // [변경] 소리 · 배경음용 알림. 정적이라 Died 구독자 수(테스트용 회복 판정)에 영향 없음
+    public static event System.Action<PlayerHealth> AnyDied;
+    public static event System.Action<PlayerHealth> AnyRevived;
 
     void Awake()
     {
@@ -138,7 +141,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return HitResult.Ignored;
         }
         if (dodge != null && dodge.IsDodging) dodge.Interrupt();
-        if (DevCheats.GodMode) return HitResult.Ignored; // [변경] 개발자 무적 (패링 · 역뢰 · 회피 판정 뒤라 그 연출은 그대로)
+        if (DevCheats.GodMode) return HitResult.Ignored; // 개발자 무적 (패링 · 역뢰 · 회피 판정 뒤라 그 연출은 그대로)
 
         TakeDamage(info.Damage); // 가드 깎임 피해와 공용
 
@@ -170,7 +173,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         }
         bool invulnerable = invulnerableTimer > 0f || (skill != null && skill.IsActive) || (execution != null && execution.IsActive)
             || (charge != null && charge.IsDashing) || (parry != null && parry.IsInvulnerable) || (kanpa != null && kanpa.IsInvulnerable);
-        if (invulnerable || DevCheats.GodMode) return false; // [변경] 무적이면 잡기도 헛잡음
+        if (invulnerable || DevCheats.GodMode) return false; // 무적이면 잡기도 헛잡음
 
         grabbed = true;
         stunTimer = 0f;
@@ -313,6 +316,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (playAnimation) PlayDeath(killingBlow);
 
         Debug.Log("[Player] 사망");
+        AnyDied?.Invoke(this); // [변경]
         Died?.Invoke();
     }
 
@@ -357,5 +361,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (locomotion != null) locomotion.MovementLocked = false;
         animator.Play(LocomotionHash, 0, 0f);
         Debug.Log("[Player] 부활");
+        AnyRevived?.Invoke(this); // [변경]
     }
 }

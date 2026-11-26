@@ -11,7 +11,8 @@ using UnityEngine;
 //  - 발도 자세 진입: 진입음을 반복음 위에 겹쳐 한 번 (반복음은 끊기지 않음)
 //  - 일섬 돌진: 표식한 적 옆을 지나가는 순간마다 베는 소리 // 돌진 시작 → 지나가는 순간(슬로와 같은 박자)
 //  - 일섬 적중(칼을 거둔 뒤 일괄 베기): 낙뢰음. 여럿을 베면 첫 소리 뒤로 작게 몇 번 더 (따다닥)
-//  - [변경] 처형: 숨통을 끊는 순간 처형 전용 소리 + 베는 소리를 낮게 겹침 / 완벽 회피: 성공 순간 맑은 "팅" + 시간이 늘어지는 울림
+//  - [변경] 사망: 쓰러지는 순간 사망 소리 (슬롯이 비면 Resources/Audio/Player/player_death), 부활하면 짧게 줄여 끔
+//  - 처형: 숨통을 끊는 순간 처형 전용 소리 + 베는 소리를 낮게 겹침 / 완벽 회피: 성공 순간 맑은 "팅" + 시간이 늘어지는 울림
 // 연결은 Tools/Setup/Player Sfx. 슬롯을 비우면 그 소리만 꺼짐
 public class PlayerSfx : MonoBehaviour
 {
@@ -41,12 +42,17 @@ public class PlayerSfx : MonoBehaviour
     [SerializeField, Range(0f, 1f)] float hitThumpVolume = 0.85f;
     [SerializeField, Range(0f, 1f)] float lightThumpScale = 0.35f; // 약공격은 쿵을 작게
 
-    [Header("Execution / Just Dodge")] // [변경]
+    [Header("Execution / Just Dodge")]
     [SerializeField] AudioClip[] executionClips;
     [SerializeField, Range(0f, 1f)] float executionVolume = 1f;
     [SerializeField, Range(0f, 1f)] float executionSliceVolume = 0.6f; // 겹치는 베는 소리 크기
     [SerializeField] AudioClip[] justDodgeClips;
     [SerializeField, Range(0f, 1f)] float justDodgeVolume = 0.8f;
+
+    [Header("Death")] // [변경]
+    [SerializeField] AudioClip deathClip;
+    [SerializeField, Range(0f, 1f)] float deathVolume = 0.9f;
+    [SerializeField] float deathFadeOnRevive = 0.8f;
 
     [Header("Footsteps")]
     [SerializeField] AudioClip[] footstepClips;
@@ -78,7 +84,7 @@ public class PlayerSfx : MonoBehaviour
     AudioSource oneShot;
     AudioSource bodySource, thumpSource;
     int lastBody = -1, lastThump = -1;
-    AudioSource executionSource, dodgeSource; // [변경]
+    AudioSource executionSource, dodgeSource;
     int lastExecution = -1, lastDodge = -1;
     PlayerExecution execution;
     PlayerDodge dodge;
@@ -88,6 +94,9 @@ public class PlayerSfx : MonoBehaviour
     int strikesThisFrame;
     AudioSource stanceStartSource;
     AudioSource stanceLoopSource;
+    AudioSource deathSource; // [변경]
+    PlayerHealth health;
+    float deathFade = -1f;   // 0 이상이면 사망 소리를 줄이는 중
 
     int lastSwing = -1;
     float airFade = -1f; // 0 이상이면 바람 소리를 줄이는 중
@@ -112,13 +121,16 @@ public class PlayerSfx : MonoBehaviour
         if (skill == null) skill = GetComponent<PlayerSkill>();
         if (heavyCharge == null) heavyCharge = GetComponent<PlayerChargeAttack>();
         if (weapon == null) weapon = GetComponentInChildren<WeaponHitbox>(true);
-        execution = GetComponent<PlayerExecution>(); // [변경]
+        execution = GetComponent<PlayerExecution>();
         dodge = GetComponent<PlayerDodge>();
+        health = GetComponent<PlayerHealth>(); // [변경]
+        if (deathClip == null) deathClip = Resources.Load<AudioClip>("Audio/Player/player_death");
+        deathSource = CreateSource("Sfx_Death", false);
 
         oneShot = CreateSource("Sfx_OneShot", false);
         bodySource = CreateSource("Sfx_HitBody", false);
         thumpSource = CreateSource("Sfx_HitThump", false);
-        executionSource = CreateSource("Sfx_Execution", false); // [변경]
+        executionSource = CreateSource("Sfx_Execution", false);
         dodgeSource = CreateSource("Sfx_JustDodge", false);
         if (footstepClips != null && footstepClips.Length > 0 && GetComponent<PlayerFootsteps>() == null)
             gameObject.AddComponent<PlayerFootsteps>().Init(footstepClips, footstepVolume, footstepPitch, footstepFullSpeed);
@@ -134,8 +146,10 @@ public class PlayerSfx : MonoBehaviour
     {
         if (weapon != null) weapon.OnHit += OnWeaponHit;
         if (combat != null) combat.AttackStarted += OnAttackStarted;
-        if (execution != null) execution.Executed += OnExecuted; // [변경]
+        if (execution != null) execution.Executed += OnExecuted;
         if (dodge != null) dodge.JustDodged += OnJustDodged;
+        PlayerHealth.AnyDied += OnDied; // [변경]
+        PlayerHealth.AnyRevived += OnRevived;
         if (skill != null)
         {
             skill.HoldStarted += OnHoldStarted;
@@ -156,8 +170,10 @@ public class PlayerSfx : MonoBehaviour
     {
         if (weapon != null) weapon.OnHit -= OnWeaponHit;
         if (combat != null) combat.AttackStarted -= OnAttackStarted;
-        if (execution != null) execution.Executed -= OnExecuted; // [변경]
+        if (execution != null) execution.Executed -= OnExecuted;
         if (dodge != null) dodge.JustDodged -= OnJustDodged;
+        PlayerHealth.AnyDied -= OnDied; // [변경]
+        PlayerHealth.AnyRevived -= OnRevived;
         pendingTimer = -1f;
         if (skill != null)
         {
@@ -194,6 +210,7 @@ public class PlayerSfx : MonoBehaviour
         UpdateAirFade();
         UpdateAirSwing();
         UpdateCharge();
+        UpdateDeathFade(); // [변경]
     }
 
     // ===== 휘두르기 =====
@@ -326,7 +343,7 @@ public class PlayerSfx : MonoBehaviour
         source.PlayOneShot(clip, volume * AudioOptions.SfxVolume);
     }
 
-    // ===== [변경] 처형 · 완벽 회피 =====
+    // ===== 처형 · 완벽 회피 =====
     // 처형 짝 모션에서 숨통을 끊는 순간(Executed): 처형 소리 + 베는 소리를 낮게 겹쳐 묵직하게
     void OnExecuted(EnemySwordsman victim)
     {
@@ -335,6 +352,36 @@ public class PlayerSfx : MonoBehaviour
     }
 
     void OnJustDodged() => PlayLayer(dodgeSource, justDodgeClips, ref lastDodge, justDodgeVolume, 1f);
+
+    // ===== [변경] 사망 =====
+    void OnDied(PlayerHealth who)
+    {
+        if (who != health || deathClip == null) return;
+        StopCharge(); // 차지 반복음이 남지 않게
+        deathFade = -1f;
+        deathSource.Stop();
+        deathSource.clip = deathClip;
+        deathSource.volume = deathVolume * AudioOptions.SfxVolume;
+        deathSource.Play();
+    }
+
+    // 부활 시 남은 울림을 짧게 줄여 끔 (부활 대기가 소리보다 짧음)
+    void OnRevived(PlayerHealth who)
+    {
+        if (who == health && deathSource.isPlaying) deathFade = 0f;
+    }
+
+    void UpdateDeathFade()
+    {
+        if (deathFade < 0f) return;
+        deathFade += Time.unscaledDeltaTime / Mathf.Max(0.01f, deathFadeOnRevive);
+        deathSource.volume = deathVolume * AudioOptions.SfxVolume * (1f - Mathf.Clamp01(deathFade));
+        if (deathFade >= 1f)
+        {
+            deathSource.Stop();
+            deathFade = -1f;
+        }
+    }
 
     // ===== Q 차지 · 발도 자세 =====
     void OnHoldStarted()

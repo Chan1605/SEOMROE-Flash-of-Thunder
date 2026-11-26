@@ -20,7 +20,7 @@ public enum TutorialGoal
     ShrineRest,     // 화톳불에서 스킬트리 열기
     UnlockSkill,
     Ultimate,       // 궁극기 한 번 쓰기 (연출이 끝나면 완료). 값이 밀리지 않게 맨 뒤에 둠
-    Gather,         // [변경] 우클릭 홀드 뇌기 집중으로 뇌기 n칸 모으기
+    Gather,         // 우클릭 홀드 뇌기 집중으로 뇌기 n칸 모으기
 }
 
 // 한 구역 수련장 진행기 (Tools/Setup/Tutorial Scene이 배치)
@@ -55,6 +55,8 @@ public class TutorialDirector : MonoBehaviour
     [SerializeField] float skipAfter = 30f;       // 어려운 단계에서 건너뛰기 안내까지 (실제 시간)
     [SerializeField] float stepDelay = 0.9f;      // 완료 표시 뒤 다음 단계까지 (실제 시간)
     [SerializeField] Key skipKey = Key.Enter;
+    [SerializeField] AudioClip stepDoneClip; // [변경] 단계 완료음 (비면 Resources/Audio/Tutorial/tutorial_step)
+    [SerializeField, Range(0f, 1f)] float stepDoneVolume = 0.8f;
 
     const string DoneKey = "Tutorial.Done";
 
@@ -75,8 +77,9 @@ public class TutorialDirector : MonoBehaviour
     PlayerExecution execution;
     PlayerThunder thunder;
     PlayerUltimate ultimate;
-    PlayerChargeAttack heavyCharge; // [변경] 뇌기 집중
+    PlayerChargeAttack heavyCharge; // 뇌기 집중
     TutorialGuide guide;
+    AudioSource sfx; // [변경]
     float gathered;
 
     int index = -1;
@@ -105,7 +108,7 @@ public class TutorialDirector : MonoBehaviour
         execution = FindAnyObjectByType<PlayerExecution>();
         thunder = FindAnyObjectByType<PlayerThunder>();
         ultimate = FindAnyObjectByType<PlayerUltimate>();
-        heavyCharge = FindAnyObjectByType<PlayerChargeAttack>(); // [변경]
+        heavyCharge = FindAnyObjectByType<PlayerChargeAttack>();
         PlayerHealth health = FindAnyObjectByType<PlayerHealth>();
         if (health != null) player = health.transform;
 
@@ -118,13 +121,17 @@ public class TutorialDirector : MonoBehaviour
         if (lockOn != null) lockOn.TargetChanged += OnLockOn;
         if (execution != null) execution.Executed += OnExecuted;
         if (ultimate != null) ultimate.Finished += OnUltimateFinished;
-        if (heavyCharge != null) heavyCharge.Gathered += OnGathered; // [변경]
+        if (heavyCharge != null) heavyCharge.Gathered += OnGathered;
         SkillTree.Changed += OnSkillTreeChanged;
         AddMissingLessons();
 
         if (exitBarrier != null) exitBarrier.SetActive(true);
 
         guide = TutorialGuide.Create(transform, titleFont, bodyFont);
+        if (stepDoneClip == null) stepDoneClip = Resources.Load<AudioClip>("Audio/Tutorial/tutorial_step"); // [변경]
+        sfx = gameObject.AddComponent<AudioSource>();
+        sfx.playOnAwake = false;
+        sfx.spatialBlend = 0f;
         NextStep();
     }
 
@@ -140,23 +147,23 @@ public class TutorialDirector : MonoBehaviour
         if (lockOn != null) lockOn.TargetChanged -= OnLockOn;
         if (execution != null) execution.Executed -= OnExecuted;
         if (ultimate != null) ultimate.Finished -= OnUltimateFinished;
-        if (heavyCharge != null) heavyCharge.Gathered -= OnGathered; // [변경]
+        if (heavyCharge != null) heavyCharge.Gathered -= OnGathered;
         SkillTree.Changed -= OnSkillTreeChanged;
     }
 
-    // [변경] 수련장에서 뺀 단계 (씬에 저장돼 있어도 지움). 처형은 본편에서 자연스럽게 배우도록 제외
+    // 수련장에서 뺀 단계 (씬에 저장돼 있어도 지움). 처형은 본편에서 자연스럽게 배우도록 제외
     static readonly TutorialGoal[] Removed = { TutorialGoal.Execute };
 
     // 이미 씬에 저장된 단계 목록엔 새 기본 단계가 없음 → 빠진 목표를 기본 순서상 바로 앞 단계 뒤에 끼움 (인스펙터에서 고친 단계는 그대로)
     void AddMissingLessons()
     {
-        lessons.RemoveAll(l => Array.IndexOf(Removed, l.goal) >= 0); // [변경]
+        lessons.RemoveAll(l => Array.IndexOf(Removed, l.goal) >= 0);
         List<Lesson> defaults = DefaultLessons();
         for (int i = 0; i < defaults.Count; i++)
         {
             Lesson lesson = defaults[i];
             if (lessons.Exists(l => l.goal == lesson.goal)) continue;
-            int at = lessons.Count; // [변경] 맨 뒤 대신 기본 순서 자리에
+            int at = lessons.Count; // 맨 뒤 대신 기본 순서 자리에
             for (int j = i - 1; j >= 0; j--)
             {
                 int found = lessons.FindIndex(l => l.goal == defaults[j].goal);
@@ -256,7 +263,7 @@ public class TutorialDirector : MonoBehaviour
         int total = lessons.FindAll(s => s.chapter == step.chapter).Count;
         guide.ShowStep(ChapterLabel(step.chapter), index - first + 1, total, step.title, step.description, step.keys, step.count);
 
-        if (step.goal == TutorialGoal.Gather && thunder != null) thunder.SpendAll(); // [변경] 빈 뇌기에서 직접 모아 보게
+        if (step.goal == TutorialGoal.Gather && thunder != null) thunder.SpendAll(); // 빈 뇌기에서 직접 모아 보게
         if (step.goal == TutorialGoal.UnlockSkill) // 이미 해금했으면 바로 완료, 포인트가 없으면 막히지 않게 완료
         {
             OnSkillTreeChanged();
@@ -300,6 +307,7 @@ public class TutorialDirector : MonoBehaviour
         if (doneTimer >= 0f) return;
         doneTimer = stepDelay;
         guide.ShowDone();
+        if (stepDoneClip != null) sfx.PlayOneShot(stepDoneClip, stepDoneVolume * AudioOptions.SfxVolume); // [변경]
     }
 
     void Finish()
@@ -373,7 +381,7 @@ public class TutorialDirector : MonoBehaviour
     void OnSkillTreeChanged() => SetProgress(TutorialGoal.UnlockSkill, CountUnlocked() - unlockedAtStart);
     void OnUltimateFinished() => Add(TutorialGoal.Ultimate);
 
-    // [변경] 모은 뇌기 합이 정수 칸을 넘을 때마다 진행도 +1
+    // 모은 뇌기 합이 정수 칸을 넘을 때마다 진행도 +1
     void OnGathered(float amount)
     {
         Lesson step = Current;
@@ -406,7 +414,7 @@ public class TutorialDirector : MonoBehaviour
         L(1, 1, TutorialGoal.JustDodge, 1, "저스트 회피", "수련 상대가 나왔습니다. 공격이 닿기 직전에 회피하면 시간이 느려지고 뇌기 1칸을 얻습니다.", "Shift (타이밍)", skippable: true),
         L(1, 1, TutorialGoal.Parry, 1, "패링", "가만히 선 채로 적의 칼이 닿기 직전에 우클릭. 뇌기 1칸을 씁니다.", "우클릭 (대기 중)", fillGauge: true, skippable: true),
         L(1, 1, TutorialGoal.Kanpa, 1, "역뢰", "콤보 중 적이 공격하면 우클릭 강공격으로 맞받아치세요.", "좌클릭 콤보 → 우클릭", skippable: true),
-        L(1, 1, TutorialGoal.Gather, 1, "뇌기 집중", "적이 가까이 있을 때 우클릭을 누르고 버티면 뇌기가 모입니다. 맞으면 끊기니 틈을 보세요. 뇌기 1칸.", "우클릭 홀드", skippable: true), // [변경] 처형 단계 대신
+        L(1, 1, TutorialGoal.Gather, 1, "뇌기 집중", "적이 가까이 있을 때 우클릭을 누르고 버티면 뇌기가 모입니다. 맞으면 끊기니 틈을 보세요. 뇌기 1칸.", "우클릭 홀드", skippable: true), // 처형 단계 대신
 
         L(2, 2, TutorialGoal.TapStrike, 1, "섬뢰일도", "Q를 짧게 누르면 가까운 적에게 번개처럼 돌진해 벱니다. 뇌기 1칸.", "Q 탭", fillGauge: true),
         L(2, 2, TutorialGoal.StanceDraw, 3, "발도 자세", "Q를 길게 누른 채 화면 가운데 조준점을 적에게 올려 표식 3개. 떼면 차례로 벱니다.", "Q 홀드 → 조준 → 떼기", fillGauge: true),

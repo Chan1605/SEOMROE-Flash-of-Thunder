@@ -11,6 +11,7 @@ using UnityEngine.UI;
 //   "# 글"  분류 머리글 (금빛 + 장식선)  "- 글"  작은 설명 (흐리게)
 //   "@ 글"  마지막 문구: 화면 가운데에 멈춰 잠시 머무름
 //   그 외   이름 줄 · 빈 줄은 간격
+// [변경] 시작할 때 엔딩 스팅어(Resources/Audio/Ending/ending_sting)를 한 번 틀고, 그동안 배경음(ending)은 줄임
 // Space를 누르고 있으면 빠르게, ESC는 건너뛰기. 게임은 멈춘 상태라 전부 실제 시간
 public class EndingCredits : MonoBehaviour
 {
@@ -21,6 +22,7 @@ public class EndingCredits : MonoBehaviour
     const float Speed = 70f;       // 초당 위로 흐르는 픽셀 (1080 기준)
     const float FastScale = 5f;
     const float FinalHold = 3f;
+    const string StingPath = "Audio/Ending/ending_sting"; // [변경]
     static readonly Color Dim = new Color(1f, 1f, 1f, 0.55f);
 
     Action onFinished;
@@ -28,6 +30,7 @@ public class EndingCredits : MonoBehaviour
     Image backdrop;
     RectTransform scroll, finalLine;
     CanvasGroup group, hint;
+    AudioSource sting; // [변경]
     float contentHeight;
     bool skip;
 
@@ -130,6 +133,7 @@ public class EndingCredits : MonoBehaviour
 
     IEnumerator Run()
     {
+        PlaySting(); // [변경]
         yield return Fade(0.8f, k => group.alpha = k);
 
         // 마지막 문구(@)가 있으면 화면 가운데(540)에 오면 멈춤, 없으면 전부 화면 위로 지나갈 때까지
@@ -150,8 +154,28 @@ public class EndingCredits : MonoBehaviour
         }
 
         RunState.SetFlag(SeenFlag);
-        yield return Fade(0.8f, k => scroll.localScale = Vector3.one * (1f + 0.03f * k)); // 살짝 다가오며
+        float stingStart = sting != null ? sting.volume : 0f; // [변경] 건너뛰어도 뚝 끊기지 않게 함께 줄임
+        yield return Fade(0.8f, k =>
+        {
+            scroll.localScale = Vector3.one * (1f + 0.03f * k); // 살짝 다가오며
+            if (sting != null) sting.volume = stingStart * (1f - k);
+        });
         onFinished?.Invoke(); // 마을로 (SceneTransition이 검게 덮고 씬을 바꾸면 이 오브젝트도 사라짐)
+    }
+
+    // [변경] 스팅어는 음악이라 배경음 볼륨을 따름
+    void PlaySting()
+    {
+        AudioClip clip = Resources.Load<AudioClip>(StingPath);
+        if (clip == null) return;
+        sting = gameObject.AddComponent<AudioSource>();
+        sting.playOnAwake = false;
+        sting.spatialBlend = 0f;
+        sting.ignoreListenerPause = true;
+        sting.clip = clip;
+        sting.volume = AudioOptions.BgmVolume;
+        sting.Play();
+        BgmDirector.Duck(clip.length);
     }
 
     static IEnumerator Fade(float duration, Action<float> step)
