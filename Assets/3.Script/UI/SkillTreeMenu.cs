@@ -10,7 +10,7 @@ using UnityEngine.Video;
 //  - 씬에 이 컴포넌트가 있으면 스킬트리가 켜짐(SkillTree.Active) → 해금 전 기능은 잠김
 //  - 레벨업마다 스킬 포인트. 화톳불 근처에서는 화면 아래 "E 휴식" 안내
 // UI는 실행할 때 코드로 생성 (SettingsMenu와 같은 레이아웃 규칙). 배치·연결은 Tools/Setup/Skill Tree + Shrines
-// [변경] 타이틀 · 설정과 같은 모양: SHRINE(세리프) + ◆── + 캡션, 고른 탭 뒤 붓질, 갈래 제목 장식선, 금빛 구분선 (한글은 본문 글꼴 유지)
+// 타이틀 · 설정과 같은 모양: SHRINE(세리프) + ◆── + 캡션, 고른 탭 뒤 붓질, 갈래 제목 장식선, 금빛 구분선 (한글은 본문 글꼴 유지)
 [DefaultExecutionOrder(9000)]
 public class SkillTreeMenu : MonoBehaviour
 {
@@ -70,7 +70,7 @@ public class SkillTreeMenu : MonoBehaviour
         if (!restored) SkillTree.Activate(data != null ? data.startPoints : 1);
         if (unlockAllAtStart) SkillTree.UnlockAll();
 
-        boxSprite = UIKit.RoundRect(64, 64, 4f, 0f); // [변경] 모서리를 덜 둥글게 (타이틀의 각진 장식과 맞춤)
+        boxSprite = UIKit.RoundRect(64, 64, 4f, 0f); // 모서리를 덜 둥글게 (타이틀의 각진 장식과 맞춤)
         outlineSprite = UIKit.RoundRect(64, 64, 4f, 2f);
         gradientSprite = UIKit.SharedGradient;
         UIKit.EnsureEventSystem();
@@ -316,10 +316,12 @@ public class SkillTreeMenu : MonoBehaviour
         {
             case SkillId.Vitality1:
             case SkillId.Vitality2:
+            case SkillId.Vitality3: // [변경]
                 if (health != null) health.AddMaxHealth(vitalityAmount * sign);
                 break;
             case SkillId.ThunderSlot1:
             case SkillId.ThunderSlot2:
+            case SkillId.ThunderSlot3: // [변경]
                 if (thunder != null) thunder.AddMaxGauge(thunderSlotAmount * sign);
                 break;
         }
@@ -329,7 +331,7 @@ public class SkillTreeMenu : MonoBehaviour
     string PassiveText(SkillId id, bool owned)
     {
         string accentHex = ColorUtility.ToHtmlStringRGB(accent);
-        bool vitality = id == SkillId.Vitality1 || id == SkillId.Vitality2;
+        bool vitality = id == SkillId.Vitality1 || id == SkillId.Vitality2 || id == SkillId.Vitality3; // [변경]
         string label = vitality ? "최대 체력" : "뇌기 칸";
         float now = vitality ? (health != null ? health.MaxHealth : 0f) : (thunder != null ? thunder.MaxGauge : 0f);
         float add = vitality ? vitalityAmount : thunderSlotAmount;
@@ -380,7 +382,7 @@ public class SkillTreeMenu : MonoBehaviour
         side.rectTransform.pivot = new Vector2(0f, 0.5f);
         side.rectTransform.sizeDelta = new Vector2(1100f, 0f);
 
-        // [변경] 머리글: SHRINE (세리프) + ◆── + "화톳불 · 스킬"
+        // 머리글: SHRINE (세리프) + ◆── + "화톳불 · 스킬"
         Text shrine = UIKit.Text(root, "SHRINE", displayFont, 50, Color.white, TextAnchor.MiddleLeft);
         UIKit.Place(shrine.rectTransform, 100f, 100f, 300f, 70f);
         shrine.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(0f, -3f);
@@ -413,7 +415,7 @@ public class SkillTreeMenu : MonoBehaviour
         BuildPreview(root);
 
         // 아래
-        Image bottom = UIKit.Image(root, gradientSprite, new Color(accent.r, accent.g, accent.b, 0.4f)); // [변경] 금빛 구분선 + ESC BACK (설정과 같게)
+        Image bottom = UIKit.Image(root, gradientSprite, new Color(accent.r, accent.g, accent.b, 0.4f)); // 금빛 구분선 + ESC BACK (설정과 같게)
         UIKit.Place(bottom.rectTransform, 70f, 962f, 1780f, 1f);
         Text escKey = UIKit.Text(root, "ESC", bodyFont, 16, new Color(1f, 1f, 1f, 0.45f), TextAnchor.MiddleLeft);
         UIKit.Place(escKey.rectTransform, 100f, 1004f, 60f, 30f);
@@ -449,7 +451,7 @@ public class SkillTreeMenu : MonoBehaviour
             {
                 Text branch = UIKit.Text(group.transform, branches[b], titleFont, 30, accent, TextAnchor.MiddleLeft);
                 UIKit.Place(branch.rectTransform, colX0 + b * colStep, 220f, boxW, 50f);
-                UIKit.Ornament(group.transform, colX0 + b * colStep, 250f, 200f, new Color(accent.r, accent.g, accent.b, 0.8f)); // [변경] 밑줄 → ◆── 장식선
+                UIKit.Ornament(group.transform, colX0 + b * colStep, 250f, 200f, new Color(accent.r, accent.g, accent.b, 0.8f)); // 밑줄 → ◆── 장식선
             }
         }
 
@@ -503,7 +505,7 @@ public class SkillTreeMenu : MonoBehaviour
     {
         const float x = 1060f, w = 780f, h = w * 9f / 16f;
 
-        videoFrame = UIKit.Image(root, outlineSprite, new Color(accent.r, accent.g, accent.b, 0.45f)); // [변경] 금빛 테두리 + 이름 아래 장식선
+        videoFrame = UIKit.Image(root, outlineSprite, new Color(accent.r, accent.g, accent.b, 0.45f)); // 금빛 테두리 + 이름 아래 장식선
         UIKit.Place(videoFrame.rectTransform, x - 4f, 210f + h * 0.5f, w + 8f, h + 8f);
 
         // 수련 노드용 수치 비교 (영상 자리)

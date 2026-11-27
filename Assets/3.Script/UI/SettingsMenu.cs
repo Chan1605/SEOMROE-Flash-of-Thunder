@@ -103,7 +103,7 @@ public class SettingsMenu : MonoBehaviour
                 Cursor.visible = false;
             }
         }
-        if (inGame && IsOpen) Time.timeScale = 0f; // 멈춘 사이 다른 스크립트가 timeScale을 바꿔도 다시 멈춤
+        if (inGame && IsOpen && !SceneTransition.Busy) Time.timeScale = 0f; // 멈춘 사이 다른 스크립트가 timeScale을 바꿔도 다시 멈춤 // [변경] 씬을 떠나는 중엔 다시 멈추지 않음
         if (IsOpen && rootGroup.alpha < 1f) rootGroup.alpha = Mathf.MoveTowards(rootGroup.alpha, 1f, Time.unscaledDeltaTime / 0.18f); // 열릴 때 페이드 인
     }
 
@@ -215,7 +215,7 @@ public class SettingsMenu : MonoBehaviour
         int row = 0;
         AddSlider(row++, "Mouse Sensitivity", 1f, 100f, () => GameSettings.Sensitivity, v => GameSettings.Sensitivity = Mathf.Round(v), v => Mathf.RoundToInt(v).ToString());
         AddToggle(row++, "Damage Numbers", () => GameSettings.ShowDamageNumbers, v => GameSettings.ShowDamageNumbers = v);
-        AddToggle(row++, "Draw Stance B&W", () => GameSettings.StanceMonochrome, v => GameSettings.StanceMonochrome = v); // [변경] 발도 자세 흑백
+        AddToggle(row++, "Draw Stance B&W", () => GameSettings.StanceMonochrome, v => GameSettings.StanceMonochrome = v); // 발도 자세 흑백
     }
 
     void BuildGraphics()

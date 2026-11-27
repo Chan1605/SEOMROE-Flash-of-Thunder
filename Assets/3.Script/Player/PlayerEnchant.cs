@@ -12,6 +12,7 @@ using UnityEngine.UI;
 //  - 끝나는 순간 주변 방전: 강림 중 맞힌 수만큼 피해 · 범위가 커짐
 //  - 강림 중 다시 R → 뇌신참: 느린 큰 베기 예고(적 거의 멈춤) → 거대한 검기, 강림은 그 자리에서 끝남 (방전 없음) // 옆 카메라 연출 뺌
 //          피해 · 체간 = 기본 + 강림 중 맞힌 수 × 배율 (상한 있음)
+// [변경] 스킬트리(검술): 뇌신 지속(시간 +durationBonus) → 뇌신참(강림 중 R) → 연쇄 뇌격(번개 튐 +chainBonus명). 처음엔 강림만
 // 강림 중 Q는 '각성 발도'(스킬트리)로 남은 시간을 떼어 씀. 남은 시간은 HUD 링(EnchantRing), 연출은 PlayerVfx가 이벤트를 받아 그림
 public class PlayerEnchant : MonoBehaviour
 {
@@ -27,6 +28,7 @@ public class PlayerEnchant : MonoBehaviour
     [Header("뇌신 강림")]
     [SerializeField] float avatarCost = 2f;
     [SerializeField] float avatarDuration = 6f;
+    [SerializeField] float durationBonus = 3f;     // [변경] 뇌신 지속 해금 시
     [SerializeField] float avatarSpeed = 1.25f;    // 공속 배율
     [SerializeField] float postureScale = 1.5f;
 
@@ -39,6 +41,7 @@ public class PlayerEnchant : MonoBehaviour
 
     [Header("번개 튐")]
     [SerializeField] int chainCount = 2;
+    [SerializeField] int chainBonus = 2;           // [변경] 연쇄 뇌격 해금 시
     [SerializeField] float chainRadius = 6f;
     [SerializeField] float chainDamage = 8f;
     [SerializeField] float chainPosture = 4f;
@@ -168,7 +171,8 @@ public class PlayerEnchant : MonoBehaviour
             return;
         }
 
-        if (!finishing && enchantAction.WasPressedThisFrame() && Time.time - startTime >= finisherMinTime && CanAct())
+        if (!finishing && enchantAction.WasPressedThisFrame() && Time.time - startTime >= finisherMinTime && CanAct()
+            && SkillTree.IsUnlocked(SkillId.EnchantFinisher)) // [변경] 뇌신참은 해금 후
         {
             StartCoroutine(Finisher());
             return;
@@ -190,7 +194,7 @@ public class PlayerEnchant : MonoBehaviour
         thunder.TrySpend(avatarCost);
         startTime = Time.time;
         thunder.Enchanted = true;
-        total = remaining = avatarDuration;
+        total = remaining = avatarDuration + (SkillTree.IsUnlocked(SkillId.EnchantDuration) ? durationBonus : 0f); // [변경]
         hits = 0;
         if (stats != null) stats.SpeedMultiplier = avatarSpeed;
 
@@ -270,7 +274,8 @@ public class PlayerEnchant : MonoBehaviour
             near.Add((t, c, (c.transform.position - from.transform.position).sqrMagnitude));
         }
         near.Sort((a, b) => a.dist.CompareTo(b.dist));
-        for (int i = 0; i < near.Count && i < chainCount; i++)
+        int maxChain = chainCount + (SkillTree.IsUnlocked(SkillId.EnchantChain) ? chainBonus : 0); // [변경]
+        for (int i = 0; i < near.Count && i < maxChain; i++)
         {
             Vector3 to = near[i].c.transform.position + Vector3.up * 1.2f;
             ThunderBolt3D.Strike(origin, to, 0.35f, 0);
@@ -350,7 +355,7 @@ public class PlayerEnchant : MonoBehaviour
         EnchantWave.Fire(gameObject, transform.position + Vector3.up * 1.1f + forward * 0.8f, forward,
             finisherRange, finisherWidth, damage, posture, LabelColor, finisherScale, true, finisherSpeed, finisherImpact); // 임팩트
         CombatTime.SlowEnemies(0.05f, 0.12f, 0.1f); // 발사 순간 짧은 멈춤
-        // [변경] 발사 순간 화면 베기는 뺌 (날아가는 장면을 끊음) → 검기가 여러 명을 베거나 터질 때로 옮김 (EnchantWave.Impact.screenCutHits)
+        // 발사 순간 화면 베기는 뺌 (날아가는 장면을 끊음) → 검기가 여러 명을 베거나 터질 때로 옮김 (EnchantWave.Impact.screenCutHits)
         if (releaseFreeze > 0f) StartCoroutine(Freeze(releaseFreeze));
         if (logEnchant) Debug.Log($"[Enchant] 뇌신참 · 맞힌 수 {hits} → 피해 {damage:0} · 체간 {posture:0}");
         Finish(false); // 강림은 여기서 끝 (방전 없음)

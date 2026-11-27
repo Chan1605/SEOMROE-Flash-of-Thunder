@@ -33,7 +33,7 @@ public class SceneTransition : MonoBehaviour
         current.StartCoroutine(current.Run(sceneName, carryState, keepSnapshot));
     }
 
-    // [변경] 창이 포커스를 잃으면 게임이 멈춰(Run In Background 꺼짐) 로딩이 100%에서 안 넘어갔음 → 전환하는 동안만 백그라운드에서도 계속 돌림
+    // 창이 포커스를 잃으면 게임이 멈춰(Run In Background 꺼짐) 로딩이 100%에서 안 넘어갔음 → 전환하는 동안만 백그라운드에서도 계속 돌림
     bool savedRunInBackground;
 
     void OnDestroy() => Application.runInBackground = savedRunInBackground;
@@ -63,6 +63,9 @@ public class SceneTransition : MonoBehaviour
             while (!load.isDone) yield return null;
         }
         yield return null; // 새 씬의 첫 프레임(Start)이 끝난 뒤 밝힘
+        // [변경] 떠나는 사이 이전 씬의 열린 메뉴가 다시 멈춰 둔 시간을 도착한 씬에서 확실히 풂 (ESC → VILLAGE 뒤 캐릭터가 안 움직이던 문제)
+        if (GamePause.IsPaused) GamePause.Set(false);
+        Time.timeScale = 1f;
 
         yield return Fade(1f, 0f, FadeIn);
         current = null;

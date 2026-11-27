@@ -36,14 +36,20 @@ public class SkillTreeData : ScriptableObject
         N(SkillId.ChainStrike3, "연격 Ⅲ", "연격을 4연까지 잇는다.", 2, 0, SkillId.ChainStrike2),
         N(SkillId.StanceMarks, "표식 확장", "발도 자세에서 찍을 수 있는 표식이 3명에서 6명으로 늘어난다.", 1, 0),
         N(SkillId.EnchantDraw, "각성 발도", "각성(R) 중 Q: 각성 시간을 떼어 그동안 비용 없이 발도 자세를 연달아 쓴다.", 2, 0, SkillId.StanceMarks),
-        N(SkillId.ChargeLevel3, "뇌기 집중", "우클릭을 누르고 버티는 동안 모이는 뇌기가 1.5배 빨라진다. (전투 중에만, 맞으면 끊김)", 1, 1), // [변경] 섬격 삭제 → 뇌기 집중 강화
+        N(SkillId.ChargeLevel3, "뇌기 집중", "우클릭을 누르고 버티는 동안 모이는 뇌기가 1.5배 빨라진다. (전투 중에만, 맞으면 끊김)", 1, 1), // 섬격 삭제 → 뇌기 집중 강화
+        // [변경] 검술: 뇌신 강림(R) 세분화 — 처음엔 강림만, 지속 → 뇌신참 → 연쇄 순으로 강해짐
+        N(SkillId.EnchantDuration, "뇌신 지속", "뇌신 강림(R) 시간이 3초 늘어난다. (6초 → 9초)", 1, 1),
+        N(SkillId.EnchantFinisher, "뇌신참", "뇌신 강림 중 R을 한 번 더: 칼에 번개를 모아 거대한 검기를 날리고 강림을 끝낸다.\n강림 중 많이 맞힐수록 피해 · 체간이 커진다. (끝날 때 방전은 없음)", 2, 1, SkillId.EnchantDuration),
+        N(SkillId.EnchantChain, "연쇄 뇌격", "뇌신 강림 중 평타가 맞으면 번개가 튀는 적이 2명에서 4명으로 늘어난다.", 2, 1, SkillId.EnchantFinisher),
         N(SkillId.KanpaSmash, "뇌락", "역뢰 성공 직후 우클릭: 뛰어올라 내려찍어 주변을 경직시키고 낙뢰를 떨어뜨린다.", 1, 2), // 용어 교체 (간파 → 역뢰)
         N(SkillId.DodgeDraw, "회피 발도", "저스트 회피 직후 Q: 뇌기 없이 가까운 적을 자동으로 표식해 곧바로 발도한다.", 2, 2, SkillId.KanpaSmash),
         // 수련 탭 (패시브)
         P(SkillId.Vitality1, "체력 단련 Ⅰ", "최대 체력이 25 늘어난다.", 1, 0),
         P(SkillId.Vitality2, "체력 단련 Ⅱ", "최대 체력이 25 더 늘어난다.", 2, 0, SkillId.Vitality1),
+        P(SkillId.Vitality3, "체력 단련 Ⅲ", "최대 체력이 25 더 늘어난다.", 3, 0, SkillId.Vitality2), // [변경]
         P(SkillId.ThunderSlot1, "뇌기 확장 Ⅰ", "뇌기 칸이 하나 늘어난다. 일섬 · 발도 · 패링을 더 자주 쓸 수 있다.", 2, 1),
         P(SkillId.ThunderSlot2, "뇌기 확장 Ⅱ", "뇌기 칸이 하나 더 늘어난다.", 2, 1, SkillId.ThunderSlot1),
+        P(SkillId.ThunderSlot3, "뇌기 확장 Ⅲ", "뇌기 칸이 하나 더 늘어난다.", 3, 1, SkillId.ThunderSlot2), // [변경]
         // 보스 상대 세기: 천뢰일섬 > 뇌신강림 > 뇌운낙뢰진. 궁극기 탭: 게이지는 패링 · 역뢰 · 저스트 회피 · 처형으로 참. V를 누르고 있으면 해금한 단계까지 고를 수 있음
         U(SkillId.UltimateStorm, "뇌운낙뢰진", "게이지 1칸 · 기본 기술\n칼을 땅에 꽂아 3초 동안 주변 11m에 낙뢰를 퍼붓고, 마지막에 가운데로 큰 낙뢰를 떨어뜨린다.\n여러 적을 쓸어 담는 기술 · 보스에겐 가장 약함 (약 70 피해)", 0),
         U(SkillId.UltimateHeavens, "천뢰일섬", "게이지 2칸 · V를 누르고 있다가 2칸에서 뗀다\n멈춘 흑백 세상에서 앞쪽 14m를 단 한 번 베고, 납도하는 순간 화면이 갈라지며 낙뢰.\n일반 적 즉사 · 보스 단일 대상 최강 (312 피해 + 큰 체간)", 2, SkillId.UltimateStorm),

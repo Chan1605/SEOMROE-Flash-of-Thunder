@@ -10,7 +10,7 @@ public enum SkillId
     StanceMarks,   // 발도 표식 3 → 6
     EnchantDraw,   // 각성 중 Q 발도
     Launcher,      // 삭제됨 (공중 콤보). 뒤 번호가 바뀌지 않게 자리만 남김 — 스킬트리에선 숨김
-    ChargeLevel3,  // [변경] 뇌기 집중 강화 (우클릭 홀드 충전 1.5배). 예전 이름 그대로 두어 저장된 해금 번호 유지
+    ChargeLevel3,  // 뇌기 집중 강화 (우클릭 홀드 충전 1.5배). 예전 이름 그대로 두어 저장된 해금 번호 유지
     KanpaSmash,    // 간파 뒤 뇌락
     DodgeDraw,     // 저스트 회피 뒤 무료 발도
     // 수련(패시브)
@@ -21,7 +21,13 @@ public enum SkillId
     // 궁극기 (V). 뇌운낙뢰진은 처음부터 열려 있음
     UltimateStorm,
     UltimateHeavens,
-    UltimateDescent
+    UltimateDescent,
+    // [변경] 뇌신 강림(R) 세분화 · 수련 Ⅲ단계. 저장된 해금 번호가 바뀌지 않게 항상 맨 뒤에 덧붙임
+    EnchantDuration, // 강림 시간 +
+    EnchantFinisher, // 강림 중 R → 뇌신참
+    EnchantChain,    // 번개 튐 대상 +
+    Vitality3,
+    ThunderSlot3
 }
 
 // 스킬 포인트 · 해금 상태 (한 판 동안만 유지)
