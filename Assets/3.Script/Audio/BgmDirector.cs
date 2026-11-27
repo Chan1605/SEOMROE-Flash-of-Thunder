@@ -3,7 +3,7 @@ using UnityEngine.SceneManagement;
 
 // 배경음 진행기: 지금 상황에 맞는 곡 이름을 정하고 Resources/Audio/BGM/<이름>을 크로스페이드로 틂 (씬 수정 없이 자동 생성, 씬을 넘어도 유지)
 // 곡 파일만 넣으면 바로 적용. 없는 곡은 대체 이름으로, 그것도 없으면 조용히 줄임
-// [변경] 연출 소리(엔딩 스팅어 등)가 울릴 때도 Duck(초)로 같은 크기까지 줄임
+// 연출 소리(엔딩 스팅어 등)가 울릴 때도 Duck(초)로 같은 크기까지 줄임
 // 플레이어가 쓰러져 있는 동안은 배경음을 DeathDuck까지 빠르게 줄임 (사망 소리가 들리게), 부활하면 원래대로
 //   village · village_dawn(흑뢰 토벌 뒤, 없으면 village) · training(수련장 · 연습장) · field(산문 이동 중)
 //   result(결과 화면, 없으면 ending) · battle(구역 전투, 없으면 field) · trial(시련의 터, 없으면 battle) · dungeon · boss · boss_phase2(없으면 boss) · ending(엔딩 크레딧)
@@ -43,9 +43,26 @@ public class BgmDirector : MonoBehaviour
         b = NewSource();
         current = a;
         PlayerHealth.AnyDied += OnPlayerDied;
+        AudioOptions.Changed += OnVolumeChanged; // [변경]
     }
 
-    void OnDestroy() => PlayerHealth.AnyDied -= OnPlayerDied;
+    void OnDestroy()
+    {
+        PlayerHealth.AnyDied -= OnPlayerDied;
+        AudioOptions.Changed -= OnVolumeChanged; // [변경]
+    }
+
+    // [변경] 설정 슬라이더(Main · Music)를 움직이면 페이드 없이 바로 그 크기로
+    void OnVolumeChanged()
+    {
+        if (current != null && current.clip != null) current.volume = TargetVolume();
+    }
+
+    float TargetVolume()
+    {
+        bool ducked = (downed != null && downed.IsDead) || Time.unscaledTime < duckUntil;
+        return ducked ? AudioOptions.BgmVolume * DeathDuck : AudioOptions.BgmVolume;
+    }
 
     void OnPlayerDied(PlayerHealth who) => downed = who;
 
@@ -76,7 +93,8 @@ public class BgmDirector : MonoBehaviour
         float target = ducked ? full * DeathDuck : full;
         float step = Time.unscaledDeltaTime / (ducked ? DuckFade : FadeTime);
         AudioSource other = current == a ? b : a;
-        current.volume = Mathf.MoveTowards(current.volume, current.clip != null ? target : 0f, step * Mathf.Max(full, 0.01f));
+        // [변경] 속도 기준에 지금 볼륨도 포함 (예전엔 목표가 작으면 줄어드는 속도도 같이 느려져 메인 볼륨을 내려도 거의 안 줄었음)
+        current.volume = Mathf.MoveTowards(current.volume, current.clip != null ? target : 0f, step * Mathf.Max(full, current.volume, 0.01f));
         other.volume = Mathf.MoveTowards(other.volume, 0f, step);
         if (other.isPlaying && other.volume <= 0f) other.Stop();
     }
